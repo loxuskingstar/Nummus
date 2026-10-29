@@ -1,0 +1,10 @@
+.env
+data/db/*
+data/logs/*
+data/backups/*
+!data/*/.gitkeep
+__pycache__/
+*.pyc
+*.json
+*.tgz
+*.sqlite3*

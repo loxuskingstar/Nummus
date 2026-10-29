@@ -1,0 +1,20 @@
+/* ---------- impression / PDF ---------- */
+@media print{
+ @page{margin:14mm}
+ body{background:#fff!important;color:#000;font-size:10pt}
+ body::before{display:none}
+ body>*:not(#print){display:none!important}
+ #print{display:block;font-family:var(--font)}
+ #print h1{font-family:var(--serif);font-size:20pt;margin-bottom:4pt}
+ #print .p-sub{color:#444;margin-bottom:2pt}
+ #print table{width:100%;border-collapse:collapse;margin-top:12pt}
+ #print th{text-align:left;border-bottom:1.5pt solid #000;padding:4pt;font-size:9pt}
+ #print td{border-bottom:.5pt solid #bbb;padding:5pt 4pt;vertical-align:top}
+ #print tr{page-break-inside:avoid;break-inside:avoid}
+ #print td.p-img{width:52mm;white-space:nowrap}
+ #print td.p-img img{width:24mm;height:24mm;object-fit:contain;margin-right:2mm}
+ #print td.r,#print th.r{text-align:right}
+ #print tfoot td{font-weight:700;border-top:1.5pt solid #000;border-bottom:0}
+ #print .p-foot{margin-top:14pt;color:#555;font-size:8.5pt}
+ #print .p-note{color:#333;font-size:9pt;margin-top:3pt}
+}

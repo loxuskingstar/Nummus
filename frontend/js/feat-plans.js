@@ -1,0 +1,163 @@
+'use strict';
+/* =====================================================================
+   PLANIFICATEUR DE RANGEMENT PHYSIQUE
+   Complète l'arborescence textuelle « Rangement » (champ Emplacement) : ici on modélise des contenants
+   (classeur, plateau, boîte, tiroir, capsules) avec des emplacements numérotés.
+   Un emplacement contient UNE pièce (un exemplaire). Une entrée de quantité 3 peut donc occuper 3 emplacements :
+   la quantité d'une fiche est un nombre d'exemplaires identiques, non des exemplaires nommés un à un.
+   Les déplacements sont journalisés ; les propositions d'organisation ne s'appliquent qu'après validation.
+   ===================================================================== */
+addModule('plans','Plans de rangement','slots','Classeurs, plateaux et boîtes avec emplacements numérotés, déplacements et plan imprimable.',{after:'storage',view:()=>viewPlans()});
+const CKINDS={classeur:'Classeur',plateau:'Plateau',boite:'Boîte',tiroir:'Tiroir',capsules:'Capsules',autre:'Autre'};
+const ctrOf=id=>state.containers.find(c=>c.id===id);
+const ctrSize=c=>Math.max(1,(c.pages||1)*(c.cols||1)*(c.rows||1));
+function placedMap(){ // itemId -> [{c,n}]
+ const m=new Map(),ids=new Set(state.items.map(i=>i.id));
+ state.containers.forEach(c=>Object.entries(c.occ||{}).forEach(([n,id])=>{if(!ids.has(id))return;(m.get(id)||m.set(id,[]).get(id)).push({c:c.id,n:+n})}));
+ return m;
+}
+const ctrFree=c=>ctrSize(c)-Object.keys(c.occ||{}).filter(n=>+n<=ctrSize(c)&&state.items.some(i=>i.id===c.occ[n])).length;
+const slotRef=(c,n)=>`${c.name}, n° ${n}`;
+const itemById=id=>state.items.find(i=>i.id===id);
+
+function viewPlans(){
+ if(view.startsWith('plans:')){const c=ctrOf(view.slice(6));if(c)return viewContainer(c)}
+ const cs=state.containers,pm=placedMap();
+ const owned=state.items.filter(i=>i.status!=='wish'),copies=owned.reduce((n,i)=>n+qtyOf(i),0),placed=[...pm.values()].reduce((n,a)=>n+a.length,0);
+ return `<header class="head"><div><h1>Plans de rangement</h1><p class="sub">Représentez vos classeurs, plateaux et boîtes. ${placed} exemplaire${placed>1?'s':''} rangé${placed>1?'s':''} sur ${copies} (${copies-placed>0?copies-placed+' sans emplacement':'tout est rangé'}).</p></div><div class="actions"><button class="btn primary" data-act="ctrNew">${ic('plus')} Nouveau contenant</button></div></header>
+ ${cs.length?`<label class="search" style="margin-bottom:16px">${ic('search')}<input id="plq" placeholder="Où est… ? (nom d’une pièce) — ou numéro d’emplacement, ex. « 14 »" autocomplete="off"></label><div id="plres"></div>
+ <div class="modgrid">${cs.map(c=>{const n=ctrSize(c),f=ctrFree(c);return `<button class="mcard glass" data-act="nav" data-v="plans:${c.id}"><h3>${ic('slots',18)} ${esc(c.name)}</h3><span class="meta">${CKINDS[c.kind]||'Contenant'} · ${n} emplacements${c.pages>1?` (${c.pages} pages)`:''}</span><div class="pbar"><i style="width:${(n-f)/n*100}%"></i></div><span class="meta">${n-f} occupés · ${f} libres</span></button>`}).join('')}</div>
+ <div class="actions" style="margin-top:18px"><button class="btn" data-act="planPropose">${ic('refresh',16)} Proposer une organisation…</button></div>`
+ :`<div class="empty glass"><b>Aucun contenant</b><p>Créez par exemple « Classeur bleu » (8 pages de 20 emplacements) ou « Plateau euros ».</p><button class="btn primary" data-act="ctrNew">${ic('plus')} Créer un contenant</button></div>`}`;
+}
+function afterPlans(){const q=$('#plq');if(q)q.addEventListener('input',()=>planSearch(q.value))}
+EXT.after.plans=afterPlans;
+function planSearch(q){
+ const el=$('#plres');if(!el)return;q=q.trim();if(!q){el.innerHTML='';return}
+ const pm=placedMap(),out=[];
+ if(/^\d+$/.test(q)){ // emplacement -> pièce
+  state.containers.forEach(c=>{const id=(c.occ||{})[q],it=id&&itemById(id);out.push(it?`<div class="exrow"><span class="mini">${thumb(it,18)}</span><span><b>${esc(it.denomination)}</b> <span class="muted small">${esc(subtitle(it))}</span><br><span class="muted small">${esc(slotRef(c,q))}</span></span><button class="btn sm" data-act="open" data-id="${it.id}">Fiche</button></div>`:(+q<=ctrSize(c)?`<div class="exrow"><span></span><span class="muted">${esc(slotRef(c,q))} — libre</span><span></span></div>`:''))});
+ }else{ // pièce -> emplacement
+  const f=compileQuery(q);
+  state.items.filter(i=>i.status!=='wish'&&f(i)).slice(0,25).forEach(it=>{const pl_=pm.get(it.id)||[];
+   out.push(`<div class="exrow"><span class="mini">${thumb(it,18)}</span><span><b>${esc(it.denomination)}</b> <span class="muted small">${esc(subtitle(it))}</span><br><span class="muted small">${pl_.length?pl_.map(x=>esc(slotRef(ctrOf(x.c),x.n))).join(' · '):'pas d’emplacement dans un plan'}${it.storage?' · texte : '+esc(normPath(it.storage)):''}</span></span><button class="btn sm" data-act="open" data-id="${it.id}">Fiche</button></div>`)});
+ }
+ el.innerHTML=`<div class="panel glass" style="margin-bottom:16px">${out.join('')||'<span class="muted">Aucun résultat.</span>'}</div>`;
+}
+function viewContainer(c){
+ const n=ctrSize(c),per=(c.cols||1)*(c.rows||1),pages=c.pages||1,pm=placedMap(),hl=ui.planHit||'';
+ const cell=k=>{const id=(c.occ||{})[k],it=id&&itemById(id);
+  return `<button class="cell ${it?'occ':''} ${hl&&it&&it.id===hl?'hit':''}" data-act="cellOpen" data-c="${c.id}" data-n="${k}" title="${esc(it?it.denomination+' — n° '+k:'Libre — n° '+k)}">${it&&it.cover?`<img src="${esc(it.cover)}" alt="">`:it?ic(it.type==='note'?'note':'coin',14):''}<span class="${it&&it.cover?'n':''}">${it&&it.cover?k:k}</span></button>`};
+ const grids=[...Array(pages)].map((_,p)=>`<div class="cpage">${pages>1?`<h4>Page ${p+1}</h4>`:''}<div class="cgrid" style="grid-template-columns:repeat(${c.cols||1},minmax(0,${c.cols>14?32:54}px))">${[...Array(per)].map((_,j)=>cell(p*per+j+1)).join('')}</div></div>`).join('');
+ const hist=state.events.filter(e=>['place','free','move'].includes(e.kind)&&((e.snap.to&&e.snap.to.c===c.id)||(e.snap.from&&e.snap.from.c===c.id))).slice(-12).reverse();
+ return `<header class="head"><div><p class="muted small"><button class="btn sm" data-act="nav" data-v="plans">← Plans</button> ${CKINDS[c.kind]||''}</p><h1>${esc(c.name)}</h1><p class="sub">${n-ctrFree(c)} occupés · ${ctrFree(c)} libres sur ${n}</p></div>
+ <div class="actions"><button class="btn" data-act="ctrPrint" data-id="${c.id}">${ic('print',16)} Imprimer le plan</button><button class="btn" data-act="ctrEdit" data-id="${c.id}">${ic('edit',16)} Modifier</button><button class="btn danger" data-act="ctrDel" data-id="${c.id}">${ic('trash',16)}</button></div></header>
+ <div class="panel glass">${grids}</div>
+ <p class="muted small" style="margin-top:8px">Cliquez un emplacement libre pour y ranger une pièce, un emplacement occupé pour la déplacer ou la retirer.</p>
+ ${hist.length?`<section class="panel glass" style="margin-top:16px"><h3>Derniers mouvements</h3>${hist.map(e=>`<div class="dl-row"><span class="muted small">${esc(dateFR(e.t))}</span><span>${esc(e.snap.name||'')} — ${e.kind==='free'?`retirée de n° ${e.snap.from.n}`:e.kind==='place'?`rangée en n° ${e.snap.to.n}`:`n° ${e.snap.from.n} → ${e.snap.to.c===c.id?'n° '+e.snap.to.n:esc((ctrOf(e.snap.to.c)||{}).name||'?')+' n° '+e.snap.to.n}`}</span><span></span></div>`).join('')}</section>`:''}`;
+}
+/* ---------- contenants ---------- */
+function ctrForm(c){
+ const k=c?c.kind:'classeur';
+ promptModal(c?'Modifier le contenant':'Nouveau contenant',`<div class="fgrid"><div class="fld wide"><label>Nom</label><input id="ct_n" required value="${esc(c?c.name:'')}" placeholder="Classeur bleu, Plateau euros…"></div>
+ <div class="fld"><label>Type</label><select id="ct_k">${opt(Object.entries(CKINDS),k)}</select></div>
+ <div class="fld"><label>Pages / plateaux</label><input id="ct_p" type="number" min="1" max="60" value="${c?c.pages||1:1}"></div>
+ <div class="fld"><label>Colonnes</label><input id="ct_c" type="number" min="1" max="30" value="${c?c.cols:5}"></div>
+ <div class="fld"><label>Lignes par page</label><input id="ct_r" type="number" min="1" max="30" value="${c?c.rows:4}"></div></div>
+ <p class="muted small">Total = pages × colonnes × lignes. Réduire la taille d’un contenant libère seulement les emplacements supprimés si ils sont vides.</p>`,'ctrOk','Enregistrer',c?`data-id="${c.id}"`:'');
+}
+SUBMIT.ctrOk=f=>{
+ const d={name:$('#ct_n').value.trim(),kind:$('#ct_k').value,pages:Math.max(1,+$('#ct_p').value||1),cols:Math.max(1,+$('#ct_c').value||1),rows:Math.max(1,+$('#ct_r').value||1)};if(!d.name)return;
+ let c=f.dataset.id?ctrOf(f.dataset.id):null;
+ if(c){const old=c.occ||{},nn=d.pages*d.cols*d.rows,lost=Object.keys(old).filter(k=>+k>nn);if(lost.length){toast('Des emplacements occupés seraient supprimés : libérez-les d’abord');return}Object.assign(c,d)}
+ else{c={id:uid(),occ:{},...d};state.containers.push(c)}
+ savePrefs();closeModal();go('plans:'+c.id);
+};
+/* ---------- cellule ---------- */
+function unplacedItems(){const pm=placedMap();return state.items.filter(i=>i.status!=='wish'&&(pm.get(i.id)||[]).length<qtyOf(i))}
+function placeLog(kind,it,from,to){logEvent(kind,it.id,{name:it.denomination,from,to})}
+Object.assign(ACT,{
+ ctrNew:()=>ctrForm(null),ctrEdit:t=>ctrForm(ctrOf(t.dataset.id)),
+ ctrDel:t=>{const c=ctrOf(t.dataset.id);if(!c||!confirm(`Supprimer le contenant « ${c.name} » ? Les pièces ne sont pas supprimées, seulement leur emplacement.`))return;state.containers=state.containers.filter(x=>x!==c);savePrefs();go('plans')},
+ cellOpen:t=>{
+  const c=ctrOf(t.dataset.c),n=+t.dataset.n,id=(c.occ||{})[n],it=id&&itemById(id);
+  if(!it){ // libre : choisir une pièce
+   PICK.c=c.id;PICK.n=n;PICK.q='';
+   openModal(`<div class="mhead"><h2>Ranger en ${esc(slotRef(c,n))}</h2><button class="x" data-act="close" aria-label="Fermer">${ic('x',22)}</button></div><label class="search" style="margin-bottom:10px">${ic('search')}<input id="pick_q" placeholder="Pièces sans emplacement complet…" autocomplete="off"></label><div id="pick_l" class="rows glass"></div>`);
+   drawPick();$('#pick_q').addEventListener('input',e=>{PICK.q=e.target.value;drawPick()});return;
+  }
+  openModal(`<div class="mhead"><div><h2>${esc(it.denomination)}</h2><p class="muted">${esc(slotRef(c,n))} · ${esc(subtitle(it))}</p></div><button class="x" data-act="close" aria-label="Fermer">${ic('x',22)}</button></div>
+  <div class="fgrid"><div class="fld"><label>Déplacer vers</label><select id="mv_c">${state.containers.map(x=>`<option value="${x.id}" ${x.id===c.id?'selected':''}>${esc(x.name)}</option>`).join('')}</select></div><div class="fld"><label>N° d’emplacement (libre)</label><input id="mv_n" type="number" min="1" placeholder="ex. 12"></div></div>
+  <div class="actions end"><button class="btn" data-act="open" data-id="${it.id}">Voir la fiche</button><button class="btn" data-act="cellFree" data-c="${c.id}" data-n="${n}">Retirer de l’emplacement</button><button class="btn primary" data-act="cellMove" data-c="${c.id}" data-n="${n}">Déplacer</button></div>`);
+ },
+ cellFree:t=>{const c=ctrOf(t.dataset.c),n=+t.dataset.n,it=itemById(c.occ[n]);delete c.occ[n];if(it)placeLog('free',it,{c:c.id,n},null);savePrefs();closeModal();render()},
+ cellMove:t=>{
+  const c=ctrOf(t.dataset.c),n=+t.dataset.n,it=itemById(c.occ[n]),d=ctrOf($('#mv_c').value),m=parseInt($('#mv_n').value);
+  if(!d||isNaN(m)||m<1||m>ctrSize(d)){toast('Numéro invalide pour ce contenant');return}
+  if((d.occ||{})[m]&&itemById(d.occ[m])){toast('Cet emplacement est déjà occupé');return}
+  delete c.occ[n];(d.occ=d.occ||{})[m]=it.id;placeLog('move',it,{c:c.id,n},{c:d.id,n:m});savePrefs();closeModal();go('plans:'+d.id);
+ },
+ pickSlot:t=>{const c=ctrOf(PICK.c),it=itemById(t.dataset.id);if(!c||!it)return;(c.occ=c.occ||{})[PICK.n]=it.id;placeLog('place',it,null,{c:c.id,n:PICK.n});savePrefs();closeModal();render()},
+});
+const PICK={c:null,n:0,q:''};
+function drawPick(){
+ const el=$('#pick_l');if(!el)return;const pm=placedMap(),f=PICK.q?compileQuery(PICK.q):()=>true;
+ const l=unplacedItems().filter(f).slice(0,60);
+ el.innerHTML=l.map(i=>`<div class="row" style="grid-template-columns:40px 1fr auto" data-act="pickSlot" data-id="${i.id}"><span class="mini">${thumb(i,18)}</span><span><b>${esc(i.denomination)}</b> <span class="muted small">${esc(subtitle(i))}</span></span><span class="muted small">${(pm.get(i.id)||[]).length}/${qtyOf(i)} rangé${qtyOf(i)>1?'s':''}</span></div>`).join('')||'<p class="muted" style="padding:10px">Tout est déjà rangé (ou aucun résultat).</p>';
+}
+/* ---------- proposition d'organisation, à valider ---------- */
+const ORG={
+ country:(a,b)=>cname(a.country).localeCompare(cname(b.country),'fr')||(+a.year||0)-(+b.year||0),
+ year:(a,b)=>(+a.year||1e9)-(+b.year||1e9)||cname(a.country).localeCompare(cname(b.country),'fr'),
+ type:(a,b)=>String(a.type).localeCompare(b.type)||ORG.country(a,b),
+ denom:(a,b)=>String(a.denomination).localeCompare(String(b.denomination),'fr',{numeric:true})||(+a.year||0)-(+b.year||0),
+ series:(a,b)=>String(a.series||'~').localeCompare(String(b.series||'~'),'fr')||ORG.year(a,b)
+};
+const ORG_L={country:'Pays puis année',year:'Année puis pays',type:'Pièces puis billets',denom:'Dénomination',series:'Série / type'};
+let PROP=null;
+ACT.planPropose=()=>{
+ if(!state.containers.length){toast('Créez d’abord un contenant');return}
+ openModal(`<div class="mhead"><h2>Proposer une organisation</h2><button class="x" data-act="close" aria-label="Fermer">${ic('x',22)}</button></div>
+ <p class="muted">Le calcul n’applique rien : vous voyez le plan proposé, puis vous validez.</p>
+ <div class="fgrid"><div class="fld"><label>Contenant cible</label><select id="pr_c">${state.containers.map(c=>`<option value="${c.id}">${esc(c.name)} (${ctrFree(c)} libres)</option>`).join('')}</select></div>
+ <div class="fld"><label>Classer par</label><select id="pr_k">${opt(Object.entries(ORG_L),'country')}</select></div>
+ <div class="fld"><label>Portée</label><select id="pr_s"><option value="free">Seulement les pièces sans emplacement, dans les places libres</option><option value="all">Tout réorganiser dans ce contenant (vide d’abord)</option></select></div></div>
+ <div class="actions end"><button class="btn primary" data-act="planCalc">Calculer</button></div><div id="pr_out"></div>`,true);
+};
+ACT.planCalc=()=>{
+ const c=ctrOf($('#pr_c').value),k=$('#pr_k').value,sc=$('#pr_s').value;
+ const pm=placedMap();let list=[];
+ const items=state.items.filter(i=>i.status!=='wish');
+ if(sc==='free'){items.forEach(i=>{for(let j=(pm.get(i.id)||[]).length;j<qtyOf(i);j++)list.push(i)})}
+ else items.forEach(i=>{const others=(pm.get(i.id)||[]).filter(x=>x.c!==c.id).length;for(let j=others;j<qtyOf(i);j++)list.push(i)});
+ list.sort(ORG[k]);
+ const slots=[];for(let n=1;n<=ctrSize(c);n++)if(sc==='all'||!(c.occ||{})[n]||!itemById(c.occ[n]))slots.push(n);
+ const plan=list.slice(0,slots.length).map((it,j)=>({it,n:slots[j]})),left=list.length-plan.length;
+ PROP={c:c.id,plan,sc};
+ $('#pr_out').innerHTML=`<h3 style="margin:14px 0 6px">${plan.length} exemplaire${plan.length>1?'s':''} à ranger${left>0?` — ${left} ne tiennent pas`:''}</h3>${sc==='all'?`<p class="notice warn">${ic('warn',16)} <span>Les ${Object.keys(c.occ||{}).length} emplacements actuels de « ${esc(c.name)} » seront vidés puis remplis selon ce plan. Chaque changement reste dans l’historique.</span></p>`:''}
+ <div class="rows glass" style="max-height:300px;overflow:auto">${plan.slice(0,200).map(x=>`<div class="row" style="grid-template-columns:70px 1fr auto"><b>n° ${x.n}</b><span>${esc(x.it.denomination)} <span class="muted small">${esc(subtitle(x.it))}</span></span><span></span></div>`).join('')}</div>
+ ${plan.length?`<div class="actions end"><button class="btn primary" data-act="planApply">Valider et appliquer</button></div>`:'<p class="muted">Rien à proposer.</p>'}`;
+};
+ACT.planApply=()=>{
+ if(!PROP)return;const c=ctrOf(PROP.c);if(!c)return;
+ if(PROP.sc==='all'){Object.entries(c.occ||{}).forEach(([n,id])=>{const it=itemById(id);if(it)placeLog('free',it,{c:c.id,n:+n},null)});c.occ={}}
+ PROP.plan.forEach(x=>{(c.occ=c.occ||{})[x.n]=x.it.id;placeLog('place',x.it,null,{c:c.id,n:x.n})});
+ PROP=null;savePrefs();closeModal();go('plans:'+c.id);toast('Organisation appliquée');
+};
+/* ---------- impression ---------- */
+ACT.ctrPrint=t=>{
+ const c=ctrOf(t.dataset.id);if(!c)return;const per=c.cols*c.rows;
+ const pages=[...Array(c.pages||1)].map((_,p)=>`<section class="pp-page"><h2 style="font:600 14pt sans-serif;margin:0 0 4mm">${esc(c.name)}${c.pages>1?` — page ${p+1}/${c.pages}`:''}</h2>
+  <div class="pp-grid" style="grid-template-columns:repeat(${c.cols},1fr)">${[...Array(per)].map((_,j)=>{const n=p*per+j+1,it=itemById((c.occ||{})[n]);return `<div class="pp-cell"><b>${n}</b>${it?`<span>${esc(it.denomination)}${hasYear(it)?'<br>'+esc(fmtYear(it.year)):''}</span>`:''}</div>`}).join('')}</div></section>`).join('');
+ let el=$('#planprint');if(!el){el=document.createElement('div');el.id='planprint';el.className='planprint';document.body.appendChild(el)}
+ el.innerHTML=pages;document.body.classList.add('printing-plan');
+ const done=()=>{document.body.classList.remove('printing-plan');el.remove();window.removeEventListener('afterprint',done)};
+ window.addEventListener('afterprint',done);setTimeout(()=>window.print(),80);
+};
+/* ---------- fiche : où est rangée cette pièce ? ---------- */
+EXT.detail.push(it=>{
+ if(it.status==='wish'||!state.containers.length||vit())return'';
+ const l=placedMap().get(it.id)||[];
+ return `<section class="vhist"><h3>Rangement (plans)</h3><p class="small" style="margin-top:6px">${l.length?l.map(x=>`<button class="chip acc" data-act="planGo" data-c="${x.c}" data-n="${x.n}" data-id="${it.id}">${esc(slotRef(ctrOf(x.c),x.n))}</button>`).join(' '):'<span class="muted">Aucun emplacement dans un plan.</span>'}</p></section>`;
+});
+ACT.planGo=t=>{closeModal();ui.planHit=t.dataset.id;go('plans:'+t.dataset.c);setTimeout(()=>{ui.planHit='';const h=$('.cell.hit');if(h)h.scrollIntoView({block:'center',behavior:'smooth'})},50)};
