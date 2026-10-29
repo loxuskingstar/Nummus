@@ -225,6 +225,7 @@ const CH={
  imgCap:t=>{formDraft.imgs[+t.dataset.i].cap=t.value},
  shFmt:t=>{SHARE.fmt=t.value;renderShare()},
  shTheme:t=>{SHARE.theme=t.value;renderShare()},
+ shStyle:t=>{SHARE.style=t.value;renderShare()},
  shValue:t=>{SHARE.value=t.checked;renderShare()},
  atWish:t=>{ui.atlas.wish=t.checked;render()},
  tlWish:t=>{ui.tl.wish=t.checked;ui.tl.from=ui.tl.to=null;renderTL()},
