@@ -3,8 +3,6 @@
 Gestionnaire de collection numismatique (pièces et billets) : interface web + API Python, un seul conteneur.
 Tout ce qui est à vous vit dans **un seul dossier, `data/`**, que l'on copie pour changer de serveur.
 
----
-
 ## Note sur le projet
 
 Ce projet est un **projet personnel**. Il a été créé pour répondre à mes propres besoins et une partie du code a été rédigée à l'aide de l'IA, il **n'est pas destiné à être maintenu activement sur le long terme**.
@@ -16,7 +14,6 @@ Cependant, si vous trouvez des bugs ou si vous avez des suggestions d'améliorat
 * **Soyez clair :** Expliquez brièvement le problème rencontré ou la fonctionnalité souhaitée.
 * **Proposez une Pull Request :** Si vous avez directement corrigé le code, n'hésitez pas à soumettre vos modifications.
 
----
 
 ## Démarrage
 
