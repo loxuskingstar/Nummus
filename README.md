@@ -3,33 +3,20 @@
 Gestionnaire de collection numismatique (pièces et billets) : interface web + API Python, un seul conteneur.
 Tout ce qui est à vous vit dans **un seul dossier, `data/`**, que l'on copie pour changer de serveur.
 
-```
-nummus/
-├── docker-compose.yml     # service unique, dossier ./data monté sur /data
-├── Dockerfile             # python:3.12-slim, utilisateur non privilégié
-├── .env.example           # variables d'environnement
-├── data/                  # ← VOS DONNÉES (ignoré par git)
-│   ├── db/                #   nummus.sqlite3 (base, images incluses)
-│   ├── backups/           #   copies cohérentes de la base (automatiques + manuelles + avant migration)
-│   └── logs/              #   nummus.log (rotation automatique)
-├── backend/               # API REST (FastAPI) + SQLite
-│   ├── app/
-│   │   ├── main.py        #   application, journaux, sert aussi le frontend
-│   │   ├── routes.py      #   contrat REST (profils, fiches, images, préférences, journal d'opérations, sauvegardes, Numista, cours)
-│   │   ├── db.py          #   SQLite (WAL) ; déplace automatiquement une ancienne base /data/nummus.sqlite3 vers db/
-│   │   ├── migrations.py  #   migrations de schéma versionnées (PRAGMA user_version)
-│   │   ├── backup.py      #   sauvegardes (API de sauvegarde SQLite) et rotation
-│   │   ├── cli.py         #   info · migrate · backup · dump · load
-│   │   ├── security.py    #   authentification HTTP Basic facultative
-│   │   └── config.py      #   lecture de l'environnement
-│   └── tests/             #   17 tests (API, migrations, sauvegardes, export/import)
-└── frontend/              # interface statique, sans étape de build
-    ├── index.html, config.js, manifest.webmanifest, sw.js
-    ├── css/               #   base, gallery, layout, print, polish, features
-    ├── js/                #   modules de base + feat-*.js (un fichier par fonctionnalité)
-    ├── vendor/            #   D3, TopoJSON, KaTeX, contours du monde (aucun CDN)
-    └── icons/
-```
+---
+
+## Note sur le projet
+
+Ce projet est un **projet personnel**. Il a été créé pour répondre à mes propres besoins et une partie du code a été rédigée à l'aide de l'IA, il **n'est pas destiné à être maintenu activement sur le long terme**.
+
+Cependant, si vous trouvez des bugs ou si vous avez des suggestions d'amélioration, toutes les recommandations et critiques constructives sont les bienvenues ! 
+
+### Comment contribuer ou proposer une amélioration :
+* **Ouvrez une Issue :** Pour signaler un bug ou proposer une idée.
+* **Soyez clair :** Expliquez brièvement le problème rencontré ou la fonctionnalité souhaitée.
+* **Proposez une Pull Request :** Si vous avez directement corrigé le code, n'hésitez pas à soumettre vos modifications.
+
+---
 
 ## Démarrage
 
@@ -38,7 +25,7 @@ cp .env.example .env        # puis éditer : NUMMUS_PASSWORD, et NUMMUS_UID/GID 
 docker compose up -d --build
 ```
 
-L'application est disponible sur <http://localhost:8080> (port réglable avec `NUMMUS_PORT`).
+Par défaut l'application est disponible sur <http://localhost:8080> (port réglable avec `NUMMUS_PORT`).
 Le dossier `./data` doit appartenir à l'utilisateur indiqué par `NUMMUS_UID`/`NUMMUS_GID` (sinon : `sudo chown -R 1000:1000 data`).
 
 | Variable | Rôle |
