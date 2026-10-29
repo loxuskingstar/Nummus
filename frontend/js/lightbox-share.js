@@ -214,8 +214,8 @@ async function drawGallery(it,o,cv){
  const cy=H*(story?.29:sq?.27:.33),ch=H*(story?.27:sq?.30:.30);
  const g=x.createRadialGradient(W/2,cy-ch*.15,0,W/2,cy-ch*.15,W*.78);g.addColorStop(0,'rgba(255,236,190,.34)');g.addColorStop(.55,'rgba(255,236,190,.07)');g.addColorStop(1,'rgba(255,236,190,0)');x.fillStyle=g;x.fillRect(0,0,W,H);
  facesRow(x,await shareEls(it),W/2,cy,W-220,ch,60,50,gold);
- const fl=cy+ch/2+14;x.fillStyle='rgba(216,180,106,.5)';x.fillRect(W/2-170,fl,340,3);
- x.textAlign='center';x.textBaseline='alphabetic';let y=fl+(sq?84:104);
+ const fl=cy+ch/2+(sq?34:44);x.fillStyle='rgba(216,180,106,.5)';x.fillRect(W/2-170,fl,340,3);
+ x.textAlign='center';x.textBaseline='alphabetic';let y=fl+(sq?90:110);
  x.fillStyle=cream;x.font=`600 ${sq?54:64}px ${SERIF}`;const lh=sq?62:74;y+=centered(x,it.denomination||'',W/2,y,W-200,lh,2)*lh-14;
  x.fillStyle=gold;x.font=`500 24px ${SANS}`;spacing(x,6);x.fillText(one(x,subLine(it).toUpperCase(),W-160),W/2,y);spacing(x,0);y+=sq?62:70;
  factGrid(x,shareFacts(it,o),W/2,y,H-118,W-240,{lab:gold,val:cream,labFont:`600 20px ${SANS}`,valFont:`500 30px ${SERIF}`,rowH:sq?84:92});
