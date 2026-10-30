@@ -175,3 +175,13 @@
 .sbw.hwdrag{opacity:.4}.sbw.hwover{outline:2px solid var(--accent)!important}
 .sbw .bar em{font-style:normal;opacity:.7;text-align:right}
 .sbw .bar{grid-template-columns:minmax(80px,1.1fr) 2fr 52px}
+
+/* ---------- trophées (la classe .badge appartient déjà aux pastilles d'accent) ---------- */
+.bdg{display:flex;flex-direction:column;gap:6px;cursor:default;border:1px solid var(--border);opacity:.82}
+.bdg h3{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:0;font-size:.95rem}
+.bdg.got{opacity:1;border-color:var(--accent);box-shadow:0 0 0 1px color-mix(in srgb,var(--accent) 35%,transparent)}
+.bdg .chip.acc{background:color-mix(in srgb,var(--accent) 22%,transparent);font-size:.7rem}
+.bdg .pbar{margin-top:auto}
+.tier{font-size:.7rem;font-weight:700;padding:1px 7px;border-radius:999px;border:1px solid currentColor}
+.tier.t1{color:#6aa84f}.tier.t2{color:#4b8bd6}.tier.t3{color:#b45fb0}.tier.t4{color:#c9a227}
+.bdg.t4.got{border-color:#c9a227;box-shadow:0 0 0 1px #c9a22766,0 0 18px #c9a22722}

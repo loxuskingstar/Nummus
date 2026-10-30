@@ -141,7 +141,7 @@ function viewBadges(){
  const fmtv=b=>`${nf1(b.v)}${b.unit||''} / ${nf1(b.goal)}${b.unit||''}`;
  const tierN=t=>`${l.filter(b=>b.tier===t&&b.done).length}/${l.filter(b=>b.tier===t).length}`;
  const show=b=>f==='all'||(f==='done'?b.done:!b.done);
- const card=b=>`<div class="mcard glass badge t${b.tier} ${b.done?'got':''}"><h3>${ic(b.icon,18)} ${esc(b.name)} ${b.done?`<span class="chip acc">${ic('check',12)} obtenu</span>`:''}</h3>
+ const card=b=>`<div class="mcard glass bdg t${b.tier} ${b.done?'got':''}"><h3>${ic(b.icon,18)} ${esc(b.name)} ${b.done?`<span class="chip acc">${ic('check',12)} obtenu</span>`:''}</h3>
   <span class="meta">${esc(b.desc)}</span><div class="pbar"><i style="width:${b.pct}%"></i></div>
   <span class="meta"><span class="tier t${b.tier}">${BADGE_TIERS[b.tier-1]}</span> ${b.done?`Obtenu le ${esc(b.date&&b.date>1?dateFR(b.date):'—')}`:esc(fmtv(b))}</span></div>`;
  return `<header class="head"><div><h1>Trophées</h1><p class="sub">${n} sur ${l.length} obtenus. Ces succès ne comparent rien aux autres : ils mesurent seulement l’avancement de votre propre collection.</p></div></header>
