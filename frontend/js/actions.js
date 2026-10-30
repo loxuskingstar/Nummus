@@ -3,7 +3,7 @@
 const ACT={
  nav:t=>go(t.dataset.v),
  davPush:()=>davPush(),davPull:()=>davPull(),
- menu:()=>{ui.menu=!ui.menu;const w=$('.menuwrap');if(w)w.innerHTML=moreWrap()},
+ menu:t=>{ui.menu=ui.menu===t.dataset.g?false:t.dataset.g;const w=$('.navgroups');if(w)w.innerHTML=moreWrap()},
  sheet:()=>openSheet(),
  sheetnav:t=>{closeModal2();go(t.dataset.v)},
  mobSearch:()=>{if(view!=='collection'&&view!=='wishlist')go('collection');setTimeout(()=>{const i=$('input[data-k=q]');if(i){i.scrollIntoView({block:'center',behavior:'smooth'});i.focus()}},60)},
@@ -178,7 +178,7 @@ document.addEventListener('pointerup',lpCancel);document.addEventListener('point
 document.addEventListener('pointermove',e=>{if(lp&&Math.hypot(e.clientX-lp.x0,e.clientY-lp.y0)>10)lpCancel()});
 document.addEventListener('contextmenu',e=>{if(e.target.closest('#results [data-id]')&&matchMedia('(pointer:coarse)').matches)e.preventDefault()});
 document.addEventListener('click',e=>{
- if(ui.menu&&!e.target.closest('.menuwrap')&&!e.target.closest('[data-act=menu]')){ui.menu=false;const w=$('.menuwrap');if(w)w.innerHTML=moreWrap()}
+ if(ui.menu&&!e.target.closest('.menu')&&!e.target.closest('[data-act=menu]')){ui.menu=false;const w=$('.navgroups');if(w)w.innerHTML=moreWrap()}
  if(lpFired){lpFired=false;e.preventDefault();return}
  if(e.target.id==='modal'){if(!formDraft)closeModal();return}
  if(e.target.id==='modal2'){closeModal2();return}
