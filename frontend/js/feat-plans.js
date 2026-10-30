@@ -3,7 +3,9 @@
    PLANIFICATEUR DE RANGEMENT PHYSIQUE
    Complète l'arborescence textuelle « Rangement » (champ Emplacement) : ici on modélise des contenants
    (classeur, plateau, boîte, tiroir, capsules) avec des emplacements numérotés.
-   Un emplacement contient UNE pièce (un exemplaire). Une entrée de quantité 3 peut donc occuper 3 emplacements :
+   Un emplacement contient une pièce principale (c.occ[n]) et, si besoin, d'autres pièces rangées dans la même case
+   (c.more[n] = liste d'identifiants) : pochette partagée, capsule commune, tiroir de médaillier.
+   Avant : un emplacement contient UNE pièce (un exemplaire). Une entrée de quantité 3 peut donc occuper 3 emplacements :
    la quantité d'une fiche est un nombre d'exemplaires identiques, non des exemplaires nommés un à un.
    Les déplacements sont journalisés ; les propositions d'organisation ne s'appliquent qu'après validation.
    ===================================================================== */
@@ -13,9 +15,22 @@ const CLOOKS={grid:'Grille simple',album:'Album relié (pochettes)',medal:'Méda
 const CKINDS={classeur:'Classeur',plateau:'Plateau',boite:'Boîte',tiroir:'Tiroir',capsules:'Capsules',autre:'Autre'};
 const ctrOf=id=>state.containers.find(c=>c.id===id);
 const ctrSize=c=>Math.max(1,(c.pages||1)*(c.cols||1)*(c.rows||1));
+/* identifiants rangés dans la case n : pièce principale puis pièces supplémentaires */
+const cellIds=(c,n)=>[(c.occ||{})[n],...(((c.more||{})[n])||[])].filter(Boolean);
+const cellItems=(c,n)=>cellIds(c,n).map(id=>state.items.find(i=>i.id===id)).filter(Boolean);
+function cellAdd(c,n,id){
+ if(cellIds(c,n).includes(id))return;
+ if(!itemById((c.occ||{})[n])){(c.occ=c.occ||{})[n]=id;return}   // case vide (ou fiche supprimée) : devient la pièce principale
+ c.more=c.more||{};(c.more[n]=c.more[n]||[]).push(id);
+}
+function cellRemove(c,n,id){
+ const m=((c.more||{})[n]||[]).filter(x=>x!==id&&itemById(x));
+ if((c.occ||{})[n]===id){if(m.length)c.occ[n]=m.shift();else delete c.occ[n]}
+ if(m.length)c.more[n]=m;else if(c.more)delete c.more[n];
+}
 function placedMap(){ // itemId -> [{c,n}]
  const m=new Map(),ids=new Set(state.items.map(i=>i.id));
- state.containers.forEach(c=>Object.entries(c.occ||{}).forEach(([n,id])=>{if(!ids.has(id))return;(m.get(id)||m.set(id,[]).get(id)).push({c:c.id,n:+n})}));
+ state.containers.forEach(c=>new Set([...Object.keys(c.occ||{}),...Object.keys(c.more||{})]).forEach(n=>cellIds(c,n).forEach(id=>{if(!ids.has(id))return;(m.get(id)||m.set(id,[]).get(id)).push({c:c.id,n:+n})})));
  return m;
 }
 const ctrFree=c=>ctrSize(c)-Object.keys(c.occ||{}).filter(n=>+n<=ctrSize(c)&&state.items.some(i=>i.id===c.occ[n])).length;
@@ -49,7 +64,7 @@ function planSearch(q){
  const el=$('#plres');if(!el)return;q=q.trim();if(!q){el.innerHTML='';return}
  const pm=placedMap(),out=[];
  if(/^\d+$/.test(q)){ // emplacement -> pièce
-  state.containers.forEach(c=>{const id=(c.occ||{})[q],it=id&&itemById(id);out.push(it?`<div class="exrow"><span class="mini">${thumb(it,18)}</span><span><b>${esc(it.denomination)}</b> <span class="muted small">${esc(subtitle(it))}</span><br><span class="muted small">${esc(slotRef(c,q))}</span></span><button class="btn sm" data-act="open" data-id="${it.id}">Fiche</button></div>`:(+q<=ctrSize(c)?`<div class="exrow"><span></span><span class="muted">${esc(slotRef(c,q))} — libre</span><span></span></div>`:''))});
+  state.containers.forEach(c=>{const its=cellItems(c,q),it=its[0];out.push(it?`<div class="exrow"><span class="mini">${thumb(it,18)}</span><span><b>${esc(its.map(x=>x.denomination).join(' + '))}</b> <span class="muted small">${esc(subtitle(it))}</span><br><span class="muted small">${esc(slotRef(c,q))}</span></span><button class="btn sm" data-act="open" data-id="${it.id}">Fiche</button></div>`:(+q<=ctrSize(c)?`<div class="exrow"><span></span><span class="muted">${esc(slotRef(c,q))} — libre</span><span></span></div>`:''))});
  }else{ // pièce -> emplacement
   const f=compileQuery(q);
   state.items.filter(i=>i.status!=='wish'&&f(i)).slice(0,25).forEach(it=>{const pl_=pm.get(it.id)||[];
@@ -59,14 +74,14 @@ function planSearch(q){
 }
 function viewContainer(c){
  const n=ctrSize(c),per=(c.cols||1)*(c.rows||1),pages=c.pages||1,pm=placedMap(),hl=ui.planHit||'';
- const cell=k=>{const id=(c.occ||{})[k],it=id&&itemById(id),lab=ctrLabel(c,k);
-  return `<button class="cell ${it?'occ':''} ${lab&&!it?'ghost':''} ${hl&&it&&it.id===hl?'hit':''}" data-act="cellOpen" data-c="${c.id}" data-n="${k}" title="${esc(it?it.denomination+' — n° '+k:(lab?'Manquante : '+lab+' — n° '+k:'Libre — n° '+k))}">${it&&it.cover?`<img src="${esc(it.cover)}" alt="">`:it?ic(it.type==='note'?'note':'coin',14):''}<span class="${it&&it.cover?'n':''}">${k}</span>${lab?`<em class="clab">${esc(lab)}</em>`:''}</button>`};
+ const cell=k=>{const its=cellItems(c,k),it=its[0],lab=ctrLabel(c,k);
+  return `<button class="cell ${it?'occ':''} ${lab&&!it?'ghost':''} ${hl&&its.some(x=>x.id===hl)?'hit':''}" data-act="cellOpen" data-c="${c.id}" data-n="${k}" title="${esc(it?its.map(x=>x.denomination).join(' + ')+' — n° '+k:(lab?'Manquante : '+lab+' — n° '+k:'Libre — n° '+k))}">${it&&it.cover?`<img src="${esc(it.cover)}" alt="">`:it?ic(it.type==='note'?'note':'coin',14):''}<span class="${it&&it.cover?'n':''}">${k}</span>${its.length>1?`<b class="mc">${its.length}</b>`:''}${lab?`<em class="clab">${esc(lab)}</em>`:''}</button>`};
  const grids=[...Array(pages)].map((_,p)=>`<div class="cpage">${pages>1?`<h4>Page ${p+1}</h4>`:''}<div class="cgrid" style="grid-template-columns:repeat(${c.cols||1},minmax(0,${c.cols>14?32:(c.look&&c.look!=='grid'?66:54)}px))">${[...Array(per)].map((_,j)=>cell(p*per+j+1)).join('')}</div></div>`).join('');
  const hist=state.events.filter(e=>['place','free','move'].includes(e.kind)&&((e.snap.to&&e.snap.to.c===c.id)||(e.snap.from&&e.snap.from.c===c.id))).slice(-12).reverse();
  return `<header class="head"><div><p class="muted small"><button class="btn sm" data-act="nav" data-v="plans">← Plans</button> ${CKINDS[c.kind]||''}</p><h1>${esc(c.name)}</h1><p class="sub">${n-ctrFree(c)} occupés · ${ctrFree(c)} libres sur ${n}${c.series&&serOf(c.series)?` · cases de la série « ${esc(serOf(c.series).name)} »`:''}</p></div>
  <div class="actions"><button class="btn" data-act="ctrPrint" data-id="${c.id}">${ic('print',16)} Imprimer le plan</button><button class="btn" data-act="ctrEdit" data-id="${c.id}">${ic('edit',16)} Modifier</button><button class="btn danger" data-act="ctrDel" data-id="${c.id}">${ic('trash',16)}</button></div></header>
  <div class="panel glass cview look-${c.look||'grid'}">${grids}</div>${c.series&&serOf(c.series)&&serOf(c.series).slots.length>n?`<p class="muted small" style="margin-top:8px">${ic('warn',14)} La série « ${esc(serOf(c.series).name)} » compte ${serOf(c.series).slots.length} cases pour ${n} emplacements : agrandissez le contenant pour les voir toutes.</p>`:''}
- <p class="muted small" style="margin-top:8px">Cliquez un emplacement libre pour y ranger une pièce, un emplacement occupé pour la déplacer ou la retirer.</p>
+ <p class="muted small" style="margin-top:8px">Cliquez un emplacement libre pour y ranger une pièce. Sur un emplacement occupé, vous pouvez déplacer ou retirer une pièce, ou en ajouter d’autres dans la même case (pastille numérotée).</p>
  ${hist.length?`<section class="panel glass" style="margin-top:16px"><h3>Derniers mouvements</h3>${hist.map(e=>`<div class="dl-row"><span class="muted small">${esc(dateFR(e.t))}</span><span>${esc(e.snap.name||'')} — ${e.kind==='free'?`retirée de n° ${e.snap.from.n}`:e.kind==='place'?`rangée en n° ${e.snap.to.n}`:`n° ${e.snap.from.n} → ${e.snap.to.c===c.id?'n° '+e.snap.to.n:esc((ctrOf(e.snap.to.c)||{}).name||'?')+' n° '+e.snap.to.n}`}</span><span></span></div>`).join('')}</section>`:''}`;
 }
 /* ---------- contenants ---------- */
@@ -85,7 +100,7 @@ SUBMIT.ctrOk=f=>{
  const d={name:$('#ct_n').value.trim(),kind:$('#ct_k').value,look:$('#ct_l').value,series:$('#ct_s').value||undefined,pages:Math.max(1,+$('#ct_p').value||1),cols:Math.max(1,+$('#ct_c').value||1),rows:Math.max(1,+$('#ct_r').value||1)};if(!d.name)return;
  let c=f.dataset.id?ctrOf(f.dataset.id):null;
  if(d.series){const ns=(serOf(d.series)||{slots:[]}).slots.length;if(ns>d.pages*d.cols*d.rows)d.pages=Math.ceil(ns/(d.cols*d.rows))}   // assez de pages pour toutes les cases de la série
- if(c){const old=c.occ||{},nn=d.pages*d.cols*d.rows,lost=Object.keys(old).filter(k=>+k>nn);if(lost.length){toast('Des emplacements occupés seraient supprimés : libérez-les d’abord');return}Object.assign(c,d)}
+ if(c){const old=c.occ||{},nn=d.pages*d.cols*d.rows,lost=[...Object.keys(old),...Object.keys(c.more||{})].filter(k=>+k>nn);if(lost.length){toast('Des emplacements occupés seraient supprimés : libérez-les d’abord');return}Object.assign(c,d)}
  else{c={id:uid(),occ:{},...d};state.containers.push(c)}
  savePrefs();closeModal();go('plans:'+c.id);
 };
@@ -96,24 +111,31 @@ Object.assign(ACT,{
  ctrNew:()=>ctrForm(null),ctrEdit:t=>ctrForm(ctrOf(t.dataset.id)),
  ctrDel:t=>{const c=ctrOf(t.dataset.id);if(!c||!confirm(`Supprimer le contenant « ${c.name} » ? Les pièces ne sont pas supprimées, seulement leur emplacement.`))return;state.containers=state.containers.filter(x=>x!==c);savePrefs();go('plans')},
  cellOpen:t=>{
-  const c=ctrOf(t.dataset.c),n=+t.dataset.n,id=(c.occ||{})[n],it=id&&itemById(id);
-  if(!it){ // libre : choisir une pièce
+  const c=ctrOf(t.dataset.c),n=+t.dataset.n,its=cellItems(c,n);
+  if(!its.length){ // libre : choisir une pièce
    PICK.c=c.id;PICK.n=n;PICK.q='';
    openModal(`<div class="mhead"><h2>Ranger en ${esc(slotRef(c,n))}</h2><button class="x" data-act="close" aria-label="Fermer">${ic('x',22)}</button></div><label class="search" style="margin-bottom:10px">${ic('search')}<input id="pick_q" placeholder="Pièces sans emplacement complet…" autocomplete="off"></label><div id="pick_l" class="rows glass"></div>`);
    drawPick();$('#pick_q').addEventListener('input',e=>{PICK.q=e.target.value;drawPick()});return;
   }
-  openModal(`<div class="mhead"><div><h2>${esc(it.denomination)}</h2><p class="muted">${esc(slotRef(c,n))} · ${esc(subtitle(it))}</p></div><button class="x" data-act="close" aria-label="Fermer">${ic('x',22)}</button></div>
-  <div class="fgrid"><div class="fld"><label>Déplacer vers</label><select id="mv_c">${state.containers.map(x=>`<option value="${x.id}" ${x.id===c.id?'selected':''}>${esc(x.name)}</option>`).join('')}</select></div><div class="fld"><label>N° d’emplacement (libre)</label><input id="mv_n" type="number" min="1" placeholder="ex. 12"></div></div>
-  <div class="actions end"><button class="btn" data-act="open" data-id="${it.id}">Voir la fiche</button><button class="btn" data-act="cellFree" data-c="${c.id}" data-n="${n}">Retirer de l’emplacement</button><button class="btn primary" data-act="cellMove" data-c="${c.id}" data-n="${n}">Déplacer</button></div>`);
+  openModal(`<div class="mhead"><div><h2>${esc(slotRef(c,n))}</h2><p class="muted">${pl(its.length,'pièce rangée','pièces rangées')} dans cette case</p></div><button class="x" data-act="close" aria-label="Fermer">${ic('x',22)}</button></div>
+  <div class="rows glass" style="margin-bottom:12px">${its.map(it=>`<div class="exrow"><span class="mini">${thumb(it,18)}</span><span><b>${esc(it.denomination)}</b> <span class="muted small">${esc(subtitle(it))}</span></span><span class="actions"><button class="btn sm" data-act="open" data-id="${it.id}">Fiche</button><button class="btn sm" data-act="cellFree" data-c="${c.id}" data-n="${n}" data-id="${it.id}">Retirer</button></span></div>`).join('')}</div>
+  <div class="actions" style="margin-bottom:14px"><button class="btn" data-act="cellAddMore" data-c="${c.id}" data-n="${n}">${ic('plus',15)} Ajouter une autre pièce dans cette case</button></div>
+  <h3 style="font-size:.95rem;margin:0 0 6px">Déplacer</h3>
+  <div class="fgrid">${its.length>1?`<div class="fld wide"><label>Pièce à déplacer</label><select id="mv_i">${its.map(it=>`<option value="${it.id}">${esc(it.denomination)}</option>`).join('')}</select></div>`:`<input type="hidden" id="mv_i" value="${its[0].id}">`}
+  <div class="fld"><label>Vers le contenant</label><select id="mv_c">${state.containers.map(x=>`<option value="${x.id}" ${x.id===c.id?'selected':''}>${esc(x.name)}</option>`).join('')}</select></div><div class="fld"><label>N° d’emplacement (libre ou occupé)</label><input id="mv_n" type="number" min="1" placeholder="ex. 12"></div></div>
+  <div class="actions end"><button class="btn primary" data-act="cellMove" data-c="${c.id}" data-n="${n}">Déplacer</button></div>`);
  },
- cellFree:t=>{const c=ctrOf(t.dataset.c),n=+t.dataset.n,it=itemById(c.occ[n]);delete c.occ[n];if(it)placeLog('free',it,{c:c.id,n},null);savePrefs();closeModal();render()},
+ cellAddMore:t=>{const c=ctrOf(t.dataset.c),n=+t.dataset.n;PICK.c=c.id;PICK.n=n;PICK.q='';
+  openModal(`<div class="mhead"><h2>Ajouter dans ${esc(slotRef(c,n))}</h2><button class="x" data-act="close" aria-label="Fermer">${ic('x',22)}</button></div><p class="muted small" style="margin-bottom:8px">Déjà dans cette case : ${esc(cellItems(c,n).map(i=>i.denomination).join(', '))}</p><label class="search" style="margin-bottom:10px">${ic('search')}<input id="pick_q" placeholder="Pièces sans emplacement complet…" autocomplete="off"></label><div id="pick_l" class="rows glass"></div>`);
+  drawPick();$('#pick_q').addEventListener('input',e=>{PICK.q=e.target.value;drawPick()})},
+ cellFree:t=>{const c=ctrOf(t.dataset.c),n=+t.dataset.n,id=t.dataset.id||(c.occ||{})[n],it=itemById(id);cellRemove(c,n,id);if(it)placeLog('free',it,{c:c.id,n},null);savePrefs();closeModal();render()},
  cellMove:t=>{
-  const c=ctrOf(t.dataset.c),n=+t.dataset.n,it=itemById(c.occ[n]),d=ctrOf($('#mv_c').value),m=parseInt($('#mv_n').value);
-  if(!d||isNaN(m)||m<1||m>ctrSize(d)){toast('Numéro invalide pour ce contenant');return}
-  if((d.occ||{})[m]&&itemById(d.occ[m])){toast('Cet emplacement est déjà occupé');return}
-  delete c.occ[n];(d.occ=d.occ||{})[m]=it.id;placeLog('move',it,{c:c.id,n},{c:d.id,n:m});savePrefs();closeModal();go('plans:'+d.id);
+  const c=ctrOf(t.dataset.c),n=+t.dataset.n,id=($('#mv_i')||{}).value||(c.occ||{})[n],it=itemById(id),d=ctrOf($('#mv_c').value),m=parseInt($('#mv_n').value);
+  if(!it||!d||isNaN(m)||m<1||m>ctrSize(d)){toast('Numéro invalide pour ce contenant');return}
+  if(d===c&&m===n){toast('Cette pièce est déjà dans cette case');return}
+  cellRemove(c,n,id);cellAdd(d,m,id);placeLog('move',it,{c:c.id,n},{c:d.id,n:m});savePrefs();closeModal();go('plans:'+d.id);
  },
- pickSlot:t=>{const c=ctrOf(PICK.c),it=itemById(t.dataset.id);if(!c||!it)return;(c.occ=c.occ||{})[PICK.n]=it.id;placeLog('place',it,null,{c:c.id,n:PICK.n});savePrefs();closeModal();render()},
+ pickSlot:t=>{const c=ctrOf(PICK.c),it=itemById(t.dataset.id);if(!c||!it)return;cellAdd(c,PICK.n,it.id);placeLog('place',it,null,{c:c.id,n:PICK.n});savePrefs();closeModal();render()},
 });
 const PICK={c:null,n:0,q:''};
 function drawPick(){
@@ -156,7 +178,7 @@ ACT.planCalc=()=>{
 };
 ACT.planApply=()=>{
  if(!PROP)return;const c=ctrOf(PROP.c);if(!c)return;
- if(PROP.sc==='all'){Object.entries(c.occ||{}).forEach(([n,id])=>{const it=itemById(id);if(it)placeLog('free',it,{c:c.id,n:+n},null)});c.occ={}}
+ if(PROP.sc==='all'){new Set([...Object.keys(c.occ||{}),...Object.keys(c.more||{})]).forEach(n=>cellItems(c,n).forEach(it=>placeLog('free',it,{c:c.id,n:+n},null)));c.occ={};c.more={}}
  PROP.plan.forEach(x=>{(c.occ=c.occ||{})[x.n]=x.it.id;placeLog('place',x.it,null,{c:c.id,n:x.n})});
  PROP=null;savePrefs();closeModal();go('plans:'+c.id);toast('Organisation appliquée');
 };
@@ -164,7 +186,7 @@ ACT.planApply=()=>{
 ACT.ctrPrint=t=>{
  const c=ctrOf(t.dataset.id);if(!c)return;const per=c.cols*c.rows;
  const pages=[...Array(c.pages||1)].map((_,p)=>`<section class="pp-page"><h2 style="font:600 14pt sans-serif;margin:0 0 4mm">${esc(c.name)}${c.pages>1?` — page ${p+1}/${c.pages}`:''}</h2>
-  <div class="pp-grid" style="grid-template-columns:repeat(${c.cols},1fr)">${[...Array(per)].map((_,j)=>{const n=p*per+j+1,it=itemById((c.occ||{})[n]);return `<div class="pp-cell"><b>${n}</b>${it?`<span>${esc(it.denomination)}${hasYear(it)?'<br>'+esc(fmtYear(it.year)):''}</span>`:''}</div>`}).join('')}</div></section>`).join('');
+  <div class="pp-grid" style="grid-template-columns:repeat(${c.cols},1fr)">${[...Array(per)].map((_,j)=>{const n=p*per+j+1,its=cellItems(c,n);return `<div class="pp-cell"><b>${n}</b>${its.length?`<span>${its.map(it=>esc(it.denomination)+(hasYear(it)?' '+esc(fmtYear(it.year)):'')).join('<br>')}</span>`:''}</div>`}).join('')}</div></section>`).join('');
  let el=$('#planprint');if(!el){el=document.createElement('div');el.id='planprint';el.className='planprint';document.body.appendChild(el)}
  el.innerHTML=pages;document.body.classList.add('printing-plan');
  const done=()=>{document.body.classList.remove('printing-plan');el.remove();window.removeEventListener('afterprint',done)};

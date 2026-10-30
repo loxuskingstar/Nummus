@@ -24,7 +24,7 @@ const AUDIT=[
 function auditRun(){
  const L=pool(),res=AUDIT.map(([k,t,d,fn])=>({k,t,d,items:fn(L)}));
  const ids=new Set(state.items.map(i=>i.id)),orph=[];
- state.containers.forEach(c=>Object.values(c.occ||{}).forEach(v=>{const id=typeof v==='string'?v:v&&v.id;if(id&&!ids.has(id))orph.push({id:c.id+':'+id,denomination:c.name+' : case vers une fiche supprimée'})}));
+ state.containers.forEach(c=>[...Object.values(c.occ||{}),...Object.values(c.more||{}).flat()].forEach(id=>{if(id&&!ids.has(id))orph.push({id:c.id+':'+id,denomination:c.name+' : case vers une fiche supprimée'})}));
  res.push({k:'orphplan',t:'Cases de plan orphelines',d:'Une case d’un plan de rangement pointe vers une fiche supprimée.',items:orph,plain:true});
  const dd=typeof ddClusters==='function'?ddClusters():[];
  res.push({k:'dups',t:'Doublons probables',d:'Fiches très proches, à fusionner ou à confirmer.',items:dd.flatMap(c=>c.items.slice(1)),link:'doubles'});

@@ -53,7 +53,7 @@ function lblItemsRaw(){
  if(LBL.src==='filtered'&&ui.lastResults.length)return ui.lastResults.filter(i=>i.status!=='wish').map(it=>({it}));
  if(LBL.src==='ctr'){
   const c=ctrOf(LBL.ctr);if(!c)return[];
-  return Object.entries(c.occ||{}).map(([n,id])=>({n:+n,it:itemById(id),c})).filter(x=>x.it).sort((a,b)=>a.n-b.n);
+  return [...new Set([...Object.keys(c.occ||{}),...Object.keys(c.more||{})])].flatMap(n=>cellItems(c,n).map(it=>({n:+n,it,c}))).sort((a,b)=>a.n-b.n);
  }
  return pool().filter(i=>i.status!=='wish').sort((a,b)=>String(a.country).localeCompare(b.country)||(+a.year||0)-(+b.year||0)).map(it=>({it}));
 }
