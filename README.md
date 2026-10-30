@@ -43,7 +43,8 @@ Le dossier `./data` doit appartenir à l'utilisateur indiqué par `NUMMUS_UID`/`
 
 | Variable | Rôle |
 |---|---|
-| `NUMMUS_PASSWORD` | Active l'authentification HTTP Basic (identifiant : `NUMMUS_USER`, défaut `nummus`). Vide = pas d'authentification : à réserver à un réseau de confiance. |
+| `NUMMUS_AUTH_MODE` / `NUMMUS_SESSION_DAYS` | `session` (défaut) : page `/login` et cookie signé valable 30 jours, donc plus de mot de passe à chaque actualisation ; `basic` : fenêtre native. L'en-tête Basic reste accepté pour les scripts (curl). Changer le mot de passe déconnecte toutes les sessions. |
+| `NUMMUS_PASSWORD` | Active l'authentification (HTTP Basic ou session) (identifiant : `NUMMUS_USER`, défaut `nummus`). Vide = pas d'authentification : à réserver à un réseau de confiance. |
 | `NUMISTA_API_KEY` | Clé Numista conservée côté serveur ; active le pré-remplissage des fiches. |
 | `NUMMUS_PORT` | Port publié sur l'hôte (défaut 8080). |
 | `NUMMUS_BACKUP_EVERY_HOURS` / `NUMMUS_BACKUP_KEEP` | Sauvegarde automatique toutes les N heures **si la base a changé** (0 = désactivée) ; nombre de copies conservées. |

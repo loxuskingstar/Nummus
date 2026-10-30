@@ -22,6 +22,9 @@ BACKUP_KEEP = int(os.environ.get("NUMMUS_BACKUP_KEEP", "7"))
 # Authentification HTTP Basic facultative (laisser vide pour la désactiver, ex. derrière un SSO).
 AUTH_USER = os.environ.get("NUMMUS_USER", "nummus")
 AUTH_PASSWORD = os.environ.get("NUMMUS_PASSWORD", "")
+# « session » : page de connexion + cookie signé (mot de passe saisi une fois) ; « basic » : fenêtre native du navigateur.
+AUTH_MODE = os.environ.get("NUMMUS_AUTH_MODE", "session").lower()
+AUTH_SESSION_DAYS = int(os.environ.get("NUMMUS_SESSION_DAYS", "30"))
 
 # Clé API Numista conservée côté serveur (proxy /api/numista/*).
 NUMISTA_API_KEY = os.environ.get("NUMISTA_API_KEY", "")

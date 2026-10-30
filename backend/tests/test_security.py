@@ -37,6 +37,23 @@ def test_bruteforce_is_throttled_then_reset_by_success(tmp_path):
         assert c.get("/api/info", headers=basic("nummus", "secret")).status_code == 200
 
 
+def test_session_login_cookie(tmp_path):
+    m = load_app(tmp_path, NUMMUS_PASSWORD="secret")
+    m["security"]._fails.clear()
+    with TestClient(m["main"].app, follow_redirects=False) as c:
+        assert c.get("/api/info").status_code == 401 and "www-authenticate" not in c.get("/api/info").headers
+        r = c.get("/")
+        assert r.status_code == 303 and r.headers["location"].startswith("/login")
+        assert c.get("/login").status_code == 200
+        assert c.post("/login", data={"user": "nummus", "password": "faux"}).status_code == 401
+        r = c.post("/login", data={"user": "nummus", "password": "secret", "next": "//evil.com"})
+        assert r.status_code == 303 and r.headers["location"] == "/" and "nummus_session" in r.cookies
+        assert c.get("/api/info").status_code == 200            # cookie conservé par le client
+        c.cookies.set("nummus_session", "1.deadbeef")
+        assert c.get("/api/info").status_code == 401
+    assert not m["security"].valid_token(m["security"].make_token(time.time() - 40 * 86400))
+
+
 def test_blob_whitelist(client):
     client.put("/api/users/u", json={"id": "u", "name": "u"})
     assert client.put("/api/users/u/images/a", content=b"%PDF-1.4", headers={"content-type": "application/pdf"}).status_code == 204

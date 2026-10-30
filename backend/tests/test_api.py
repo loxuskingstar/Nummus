@@ -97,7 +97,7 @@ def test_backups_endpoint(client):
 
 
 def test_basic_auth(tmp_path):
-    m = load_app(tmp_path, NUMMUS_PASSWORD="secret", NUMMUS_USER="jean")
+    m = load_app(tmp_path, NUMMUS_PASSWORD="secret", NUMMUS_USER="jean", NUMMUS_AUTH_MODE="basic")
     with TestClient(m["main"].app) as c:
         assert c.get("/api/health").status_code == 200
         assert c.get("/api/users").status_code == 401

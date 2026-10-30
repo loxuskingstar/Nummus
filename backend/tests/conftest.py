@@ -9,7 +9,7 @@ MODULES = ["app.config", "app.migrations", "app.db", "app.backup", "app.security
 
 def load_app(tmp_path, **env):
     """Recharge l'application avec un dossier de données isolé et l'environnement demandé."""
-    for k in ("NUMMUS_PASSWORD", "NUMMUS_USER", "NUMMUS_BACKUP_EVERY_HOURS", "NUMMUS_BACKUP_KEEP"):
+    for k in ("NUMMUS_PASSWORD", "NUMMUS_USER", "NUMMUS_AUTH_MODE", "NUMMUS_AUTH_MAX_FAILS", "NUMMUS_BACKUP_EVERY_HOURS", "NUMMUS_BACKUP_KEEP"):
         os.environ.pop(k, None)
     os.environ["NUMMUS_DATA_DIR"] = str(tmp_path)
     os.environ["NUMMUS_BACKUP_EVERY_HOURS"] = "0"
