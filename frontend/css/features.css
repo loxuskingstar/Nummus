@@ -185,3 +185,5 @@
 .tier{font-size:.7rem;font-weight:700;padding:1px 7px;border-radius:999px;border:1px solid currentColor}
 .tier.t1{color:#6aa84f}.tier.t2{color:#4b8bd6}.tier.t3{color:#b45fb0}.tier.t4{color:#c9a227}
 .bdg.t4.got{border-color:#c9a227;box-shadow:0 0 0 1px #c9a22766,0 0 18px #c9a22722}
+/* plusieurs pièces dans une même case : pastille de compte */
+.cell .mc{position:absolute;top:-4px;right:-4px;min-width:16px;height:16px;padding:0 4px;border-radius:9px;background:var(--accent);color:var(--on-accent,#fff);font:700 10px/16px var(--font);text-align:center;pointer-events:none;z-index:2}

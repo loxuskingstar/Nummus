@@ -88,6 +88,8 @@ async function saveItem(){
  collectForm();const it=formDraft;
  if(!String(it.denomination||'').trim()){toast('Indiquez une dénomination');return}
  if(it.status!=='wish'&&!it.qty)it.qty=1;
+ if(it._dupOk)delete it._dupOk;
+ else if(!state.items.some(x=>x.id===it.id)&&typeof dupAsk==='function'){const d=findDups([it]);if(d.length){dupAsk(d[0][1],it);return}}
  if(it.status!=='wish'&&!isEmpty(it.value)&&!isNaN(+it.value)&&(isEmpty(it._prevValue)||+it._prevValue!==+it.value))addHist(it,today(),+it.value);
  const ids=new Set((it.imgs||[]).map(m=>m.id));
  try{

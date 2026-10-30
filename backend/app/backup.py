@@ -67,3 +67,55 @@ def _loop() -> None:
 def start() -> None:
     if BACKUP_EVERY_HOURS > 0:
         threading.Thread(target=_loop, daemon=True, name="nummus-backup").start()
+
+
+def restore(name: str) -> dict:
+    """Remplace la base courante par une sauvegarde. Une copie « pre-restore-… » de l'état actuel est faite d'abord
+    (jamais supprimée par la rotation). La sauvegarde est vérifiée (intégrité + version) avant toute écriture."""
+    from . import migrations
+    if not NAME_RE.match(name) or not (BACKUP_DIR / name).is_file():
+        raise ValueError("Sauvegarde introuvable")
+    src = sqlite3.connect(f"file:{(BACKUP_DIR / name).as_posix()}?mode=ro", uri=True)
+    try:
+        if src.execute("PRAGMA integrity_check").fetchone()[0] != "ok":
+            raise ValueError("Sauvegarde corrompue")
+        v = src.execute("PRAGMA user_version").fetchone()[0]
+        if v > migrations.LATEST:
+            raise ValueError(f"Sauvegarde en schéma v{v}, plus récent que cette application (v{migrations.LATEST})")
+        if not src.execute("SELECT 1 FROM sqlite_master WHERE name='items'").fetchone():
+            raise ValueError("Ce fichier n'est pas une sauvegarde Nummus")
+        safety = run_backup("pre-restore")
+        dst = sqlite3.connect(DB_PATH, timeout=30)
+        try:
+            src.backup(dst)
+            dst.commit()
+            migrations.migrate(dst) if v < migrations.LATEST else None
+        finally:
+            dst.close()
+    finally:
+        src.close()
+    log.warning("base restaurée depuis %s (état précédent : %s)", name, safety)
+    return {"restored": name, "safety": safety}
+
+
+def integrity() -> dict:
+    """Contrôle de la base : PRAGMA integrity_check + images non référencées par une fiche."""
+    import json
+    c = sqlite3.connect(DB_PATH)
+    try:
+        ok = c.execute("PRAGMA integrity_check").fetchone()[0]
+        used: dict[str, set] = {}
+        for uid, data in c.execute("SELECT user_id,data FROM items"):
+            try:
+                it = json.loads(data)
+            except Exception:
+                continue
+            s = used.setdefault(uid, set())
+            for m in (it.get("imgs") or []) + (it.get("docs") or []):
+                if isinstance(m, dict) and m.get("id"):
+                    s.add(m["id"])
+        orphans = [(u, i) for u, i in c.execute("SELECT user_id,id FROM images") if i not in used.get(u, set())]
+        missing = sum(1 for u, s in used.items() for i in s if not c.execute("SELECT 1 FROM images WHERE user_id=? AND id=?", (u, i)).fetchone())
+        return {"sqlite": ok, "orphan_images": len(orphans), "missing_images": missing}
+    finally:
+        c.close()

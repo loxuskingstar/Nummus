@@ -18,8 +18,19 @@ h2.sect{font-size:22px}
 .pillnav>button:hover,.pillnav .menuwrap>button:hover{color:var(--text);background:var(--surface3)}
 .pillnav button.on{background:var(--text);color:var(--bg);font-weight:600}
 .topact{display:flex;justify-content:flex-end;gap:8px;align-items:center}
+.navgroups{display:contents}
 .menuwrap{position:relative;display:flex}
-.menu{position:absolute;top:calc(100% + 10px);right:0;min-width:240px;border-radius:22px;padding:8px;box-shadow:var(--shadow);background:var(--surface-strong);z-index:40;max-height:70vh;overflow:auto}
+.pillnav .menuwrap>button .ic:last-child{width:11px;height:11px;opacity:.55;margin-left:-2px;transform:rotate(90deg);transition:transform var(--t)}
+.pillnav .menuwrap>button[aria-expanded=true] .ic:last-child{transform:rotate(-90deg)}
+.pillnav .menuwrap>button[aria-expanded=true]{color:var(--text);background:var(--surface3)}
+.pillnav .menuwrap>button.on{background:var(--text);color:var(--bg)}
+.pillnav .menuwrap>button.on .ic:last-child{opacity:.7}
+.menu .mi{align-items:flex-start;padding:10px 12px}
+.menu .mi .ic{margin-top:2px;color:var(--accent);flex:none}
+.menu .mi span{display:flex;flex-direction:column;gap:2px;min-width:0}
+.menu .mi b{font-weight:600;font-size:14px}
+.menu .mi small{color:var(--muted);font-size:12px;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.menu{position:absolute;top:calc(100% + 12px);left:50%;transform:translateX(-50%);width:320px;max-width:88vw;border-radius:22px;padding:8px;box-shadow:var(--shadow);background:var(--surface-strong);z-index:40;max-height:70vh;overflow:auto}
 .menu button{display:flex;gap:10px;align-items:center;width:100%;border:0;background:none;padding:9px 12px;border-radius:12px;text-align:left;color:var(--text)}
 .menu button:hover{background:var(--surface3)}.menu button.on{background:color-mix(in srgb,var(--accent) 18%,transparent)}
 .menuh{font:600 11px var(--font);text-transform:uppercase;letter-spacing:.12em;color:var(--muted);padding:10px 12px 4px}
@@ -76,3 +87,13 @@ h2.sect{font-size:22px}
  .head{align-items:flex-start}
 }
 @media(prefers-reduced-motion:reduce){*{transition:none!important}}
+/* palette de commandes */
+.pal-back{position:fixed;inset:0;z-index:90;background:rgba(0,0,0,.45);display:flex;justify-content:center;align-items:flex-start;padding:12vh 14px 0}
+.pal{width:min(620px,100%);border-radius:20px;overflow:hidden;box-shadow:var(--shadow);background:var(--surface-strong);display:flex;flex-direction:column;max-height:70vh}
+.pal input{border:0;border-bottom:1px solid var(--border);border-radius:0;background:transparent;padding:16px 18px;font-size:17px;outline:none;color:var(--text)}
+#palList{overflow:auto;padding:6px}
+.pal-i{display:flex;align-items:center;gap:12px;width:100%;border:0;background:none;padding:10px 12px;border-radius:12px;text-align:left;color:var(--text)}
+.pal-i span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.pal-i small{color:var(--muted);font-size:12px;white-space:nowrap}
+.pal-i.on,.pal-i:hover{background:color-mix(in srgb,var(--accent) 18%,transparent)}
+.pal-i .ic{color:var(--accent)}
+.pal-foot{padding:8px 16px;border-top:1px solid var(--border)}

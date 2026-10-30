@@ -98,3 +98,54 @@ def test_numista_proxy_is_cached(tmp_path, monkeypatch):
         assert r.headers["x-nummus-cache"] == "hit" and len(calls) == 1
         c.get("/api/numista/types/2")
         assert len(calls) == 2
+
+
+def test_restore_from_backup(tmp_path):
+    m = load_app(tmp_path)
+    with TestClient(m["main"].app) as c:
+        c.put("/api/users/u", json={"id": "u", "name": "u"})
+        c.put("/api/users/u/items/a", json={"id": "a", "denomination": "avant"})
+        name = c.post("/api/backups").json()["name"]
+        c.put("/api/users/u/items/a", json={"id": "a", "denomination": "apres"})
+        c.put("/api/users/u/items/b", json={"id": "b"})
+        assert c.post("/api/backups/inconnu.sqlite3/restore").status_code == 400
+        r = c.post(f"/api/backups/{name}/restore")
+        assert r.status_code == 200 and r.json()["safety"].startswith("pre-restore")
+        items = {i["id"]: i for i in c.get("/api/users/u/items").json()}
+        assert set(items) == {"a"} and items["a"]["denomination"] == "avant"
+        assert any(b["name"].startswith("pre-restore") for b in c.get("/api/backups").json())
+        assert c.get("/api/integrity").json()["sqlite"] == "ok"
+
+
+def test_password_change_and_sessions(tmp_path):
+    m = load_app(tmp_path, NUMMUS_PASSWORD="secret")
+    m["security"]._fails.clear()
+    with TestClient(m["main"].app, follow_redirects=False) as c:
+        assert c.post("/login", data={"user": "nummus", "password": "secret"}).status_code == 303
+        assert c.post("/api/auth/password", json={"current": "faux", "new": "nouveau-mdp"}).status_code == 403
+        assert c.post("/api/auth/password", json={"current": "secret", "new": "court"}).status_code == 400
+        assert c.post("/api/auth/password", json={"current": "secret", "new": "nouveau-mdp"}).status_code == 204
+        assert c.get("/api/info").status_code == 200                       # session courante renouvelée
+        with TestClient(m["main"].app, follow_redirects=False) as c2:
+            assert c2.post("/login", data={"user": "nummus", "password": "secret"}).status_code == 401
+            assert c2.post("/login", data={"user": "nummus", "password": "nouveau-mdp"}).status_code == 303
+        assert (tmp_path / "auth.json").stat().st_mode & 0o077 == 0
+
+
+def test_share_link_public_readonly(tmp_path):
+    m = load_app(tmp_path, NUMMUS_PASSWORD="secret")
+    m["security"]._fails.clear()
+    with TestClient(m["main"].app, follow_redirects=False) as c:
+        assert c.post("/api/shares", json={"html": "<!doctype html><p>x"}).status_code == 401
+        c.post("/login", data={"user": "nummus", "password": "secret"})
+        assert c.post("/api/shares", json={"html": "<script>"}).status_code == 400
+        t = c.post("/api/shares", json={"html": "<!doctype html><p>salle 1", "title": "Expo", "days": 1}).json()["token"]
+        with TestClient(m["main"].app, follow_redirects=False) as anon:           # sans session
+            r = anon.get(f"/s/{t}")
+            assert r.status_code == 200 and "salle 1" in r.text and "script-src" not in r.headers["content-security-policy"] and "default-src 'none'" in r.headers["content-security-policy"]
+            assert anon.get("/s/inconnu").status_code == 404
+            assert anon.get("/api/shares").status_code == 401
+        assert c.get("/api/shares").json()[0]["views"] == 1
+        c.delete(f"/api/shares/{t}")
+        with TestClient(m["main"].app) as anon:
+            assert anon.get(f"/s/{t}").status_code == 404

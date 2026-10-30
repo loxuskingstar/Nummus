@@ -39,10 +39,18 @@ V3_INDEXES = """
 CREATE INDEX IF NOT EXISTS items_user ON items (user_id, updated);
 """
 
+V4_SHARES = """
+-- Liens de partage en lecture seule : page HTML autonome (ex. exposition) publiée sous /s/<jeton>.
+CREATE TABLE IF NOT EXISTS shares (token TEXT PRIMARY KEY, user_id TEXT NOT NULL, kind TEXT NOT NULL, title TEXT NOT NULL,
+                                   html BLOB NOT NULL, created REAL NOT NULL, expires REAL NOT NULL DEFAULT 0,
+                                   views INTEGER NOT NULL DEFAULT 0);
+"""
+
 MIGRATIONS = [
     (1, "schéma initial (profils, fiches, images, préférences)", V1_BASE),
     (2, "journal d'événements", V2_EVENTS),
     (3, "index des fiches par profil", V3_INDEXES),
+    (4, "liens de partage", V4_SHARES),
 ]
 LATEST = MIGRATIONS[-1][0]
 

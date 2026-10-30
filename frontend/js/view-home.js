@@ -82,7 +82,7 @@ async function fxLoad(){
 function fxPaint(){const o=$('#fx_out'),n=$('#fx_note');if(!o)return;o.textContent=FX.rate?new Intl.NumberFormat('fr-FR',{maximumFractionDigits:2}).format(FX.amt*FX.rate):'—';n.textContent=FX.rate?`1 ${FX.from} ≈ ${FX.rate} ${FX.to}`:(FX.err?'Cours indisponible (hors ligne)':'')}
 function openSheet(){
  const items=NAV.filter(navAllowed).filter(n=>!['home','collection','stats'].includes(n[0])),cats=visCats();
- openModal2(`<div class="mhead"><h2>Menu</h2><button class="x" data-act="close2" aria-label="Fermer">${ic('x',22)}</button></div><div class="sheetgrid">${items.map(n=>`<button data-act="sheetnav" data-v="${n[0]}">${ic(n[2],22)}<span>${n[1]}</span></button>`).join('')}</div>
+ openModal2(`<div class="mhead"><h2>Menu</h2><button class="x" data-act="close2" aria-label="Fermer">${ic('x',22)}</button></div>${groupedNav().map(([g,l])=>{const l2=l.filter(n=>!['stats'].includes(n[0]));return l2.length?`<div class="menuh">${g[1]}</div><div class="sheetgrid">${l2.map(n=>`<button data-act="sheetnav" data-v="${n[0]}">${ic(n[2],22)}<span>${n[1]}</span></button>`).join('')}</div>`:''}).join('')}
  ${cats.length?`<div class="menuh">Catalogues</div><div class="sheetlist">${cats.map(c=>`<button class="btn" data-act="sheetnav" data-v="cat:${c.id}" style="justify-content:flex-start">${ic('book',15)} ${esc(c.name)}</button>`).join('')}</div>`:''}
  ${!vit()&&state.folders.length?`<div class="menuh">Dossiers intelligents</div><div class="sheetlist">${state.folders.map(f=>`<button class="btn" data-act="sheetnav" data-v="folder:${f.id}" style="justify-content:flex-start">${ic('filter',15)} ${esc(f.name)}</button>`).join('')}</div>`:''}
  <div class="actions end">${vit()?`<button class="btn" data-act="vitOff">${ic('x',16)} Quitter la vitrine</button>`:`<button class="btn" data-act="vitOn">${ic('eye',16)} Mode vitrine</button>`}</div>`);
@@ -95,14 +95,14 @@ function render(){
  applyTheme();
  const al=NAV.filter(navAllowed),prim=al.filter(n=>PRIMARY.includes(n[0])),v=vit();
  const act=v?`<button class="btn" data-act="vitOff">${ic('x',16)}<span class="lbl">Quitter la vitrine</span></button>`
-  :`<button class="btn" data-act="vitOn" title="Mode vitrine" aria-label="Mode vitrine">${ic('eye',16)}<span class="lbl">Vitrine</span></button><button class="btn primary" data-act="add" aria-label="Ajouter">${ic('plus',16)}<span class="lbl">Ajouter</span></button><button class="btn prof" data-act="nav" data-v="settings" title="Profil et réglages" aria-label="Réglages">${ic('user',16)}<span>${esc(userName())}</span></button>`;
+  :`<button class="btn" data-act="palette" title="Recherche et commandes (Ctrl+K)" aria-label="Recherche et commandes">${ic('search',16)}</button><button class="btn" data-act="vitOn" title="Mode vitrine" aria-label="Mode vitrine">${ic('eye',16)}<span class="lbl">Vitrine</span></button><button class="btn primary" data-act="add" aria-label="Ajouter">${ic('plus',16)}<span class="lbl">Ajouter</span></button><button class="btn prof" data-act="nav" data-v="settings" title="Profil et réglages" aria-label="Réglages">${ic('user',16)}<span>${esc(userName())}</span></button>`;
  const rail='';
  const bn=[['home','Accueil','home','nav'],['collection','Collection','grid','nav'],['search','Recherche','search','mobSearch'],['stats','Stats','chart','nav'],['more','Plus','more','sheet']].filter(b=>!['tools','stats'].includes(b[0])||al.some(n=>n[0]===b[0]));
  const bnHTML=bn.map(b=>`<button class="${b[0]===view||(b[0]==='more'&&!['home','collection','stats'].includes(view))?'on':''}" data-act="${b[3]}" data-v="${b[0]}">${ic(b[2],22)}<span>${b[1]}</span></button>`).join('');
- const foot=`<footer class="pfoot muted small"><span id="pstate">${persistent?(Store.kind==='rest'?'Synchronisé avec le serveur':'Enregistré dans ce navigateur'):'Mode temporaire'}</span></footer>`;
+ const foot=`<footer class="pfoot muted small"><span id="pstate">${persistent?(Store.kind==='rest'?(Store.statusText?Store.statusText():'Synchronisé avec le serveur'):'Enregistré dans ce navigateur'):'Mode temporaire'}</span></footer>`;
  const views={home:viewHome,collection:viewList,wishlist:viewList,catalogs:viewCatalogs,atlas:viewAtlas,timeline:viewTimeline,stats:viewStats,doubles:viewDoubles,storage:viewStorage,tools:viewTools,settings:viewSettings,favorites:viewList,...EXT.views};
  const fn=(view.startsWith('folder:')||view.startsWith('cat:'))?viewList:(views[view]||EXT.views[view.split(':')[0]]||viewList);
- $('#app').innerHTML=`<header class="topbar glass"><div class="brand"><i></i><span>Nummus</span></div><nav class="pillnav" aria-label="Navigation">${prim.map(navBtn).join('')}<div class="menuwrap">${moreWrap()}</div></nav><div class="topact">${act}</div></header>
+ $('#app').innerHTML=`<header class="topbar glass"><div class="brand"><i></i><span>Nummus</span></div><nav class="pillnav" aria-label="Navigation">${prim.map(navBtn).join('')}<div class="navgroups">${moreWrap()}</div></nav><div class="topact">${act}</div></header>
  <div class="page ${rail?'':'norail'}"><main class="main">${fn()}${foot}</main>${rail}</div>
  <nav class="bottomnav glass" aria-label="Navigation mobile">${bnHTML}</nav>${v?'':`<button class="fab" data-act="add" data-status="${view==='wishlist'?'wish':'owned'}" aria-label="Ajouter">${ic('plus',26)}</button>`}`;
  if(isListView())renderResults();

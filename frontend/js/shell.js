@@ -13,7 +13,9 @@ function addModule(key,label,icon,desc,opts={}){
 let view='home';
 const emptyFilters=()=>({q:'',cat:'',type:'',country:'',metal:'',grade:'',yearMin:'',yearMax:'',valueMin:'',valueMax:'',tag:'',trade:false,storage:'',nostorage:false});
 const ui={menu:false,filters:emptyFilters(),sort:'recent',showFilters:false,selecting:false,picked:new Set(),lastResults:[],atlas:{type:'',wish:false,sel:null},tl:{from:null,to:null,type:'',wish:false,country:null},gloss:{q:'',letter:''}};
-const isOn=k=>!k||state.modules[k]!==false;
+/* mode simple : masque les modules avancés (les données et leurs réglages individuels sont conservés) */
+const SIMPLE_HIDE=['explore','insights','timemachine','mints','labels','expos','journal','audit','report','badges','series','quick','doubles'];
+const isOn=k=>!k||(state.modules[k]!==false&&!(state.settings&&state.settings.simple&&SIMPLE_HIDE.includes(k)));
 const navAllowed=n=>isOn(n[3])&&(!vit()||n[4]);
 const isListView=()=>view==='collection'||view==='wishlist'||view==='favorites'||view.startsWith('folder:')||view.startsWith('cat:');
 const catOf=v=>state.catalogs.find(c=>'cat:'+c.id===v);
@@ -40,12 +42,26 @@ function applyTheme(){
 matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change',()=>state&&applyTheme());
 
 /* ---------- gabarit : barre haute, widgets latéraux, hero, catalogues ---------- */
-const PRIMARY=['home','collection','wishlist','catalogs','atlas','stats'];
+const PRIMARY=['home','collection'];
+/* groupes du menu haut : un module inconnu (ajouté plus tard) tombe dans le dernier groupe */
+const NAV_GROUPS=[
+ ['build','Constituer','layers',['entry','wishlist','favorites','catalogs','series','quick','doubles']],
+ ['explore','Explorer','globe',['atlas','timeline','mints','explore','timemachine']],
+ ['analyse','Analyser','chart',['stats','report','insights','badges','tools']],
+ ['manage','Gérer','slots',['storage','labels','expos','journal','audit','trash']]];
+const navGroupOf=k=>(NAV_GROUPS.find(g=>g[3].includes(k))||NAV_GROUPS[NAV_GROUPS.length-1])[0];
+function groupedNav(){
+ const al=NAV.filter(navAllowed).filter(n=>!PRIMARY.includes(n[0])&&n[0]!=='settings');
+ return NAV_GROUPS.map(g=>[g,al.filter(n=>navGroupOf(n[0])===g[0]).sort((x,y)=>{const i=g[3].indexOf(x[0]),j=g[3].indexOf(y[0]);return (i<0?99:i)-(j<0?99:j)})]).filter(([,l])=>l.length);
+}
 const navBtn=n=>`<button class="${view===n[0]?'on':''}" data-act="nav" data-v="${n[0]}" title="${n[1]}">${ic(n[2],17)}<span>${n[1]}</span></button>`;
 function moreWrap(){
- const more=NAV.filter(navAllowed).filter(n=>!PRIMARY.includes(n[0])),on=more.some(n=>n[0]===view||n[0]===view.split(':')[0])||view.startsWith('folder:');
- const folders=(!vit()&&state.folders.length)?`<div class="menuh">Dossiers intelligents</div>${state.folders.map(f=>`<button class="${view==='folder:'+f.id?'on':''}" data-act="nav" data-v="folder:${f.id}">${ic('folder',16)} ${esc(f.name)}</button>`).join('')}`:'';
- return `<button class="${on?'on':''}" data-act="menu" aria-haspopup="true" aria-expanded="${ui.menu}">${ic('more',17)}<span>Plus</span></button>${ui.menu?`<div class="menu glass">${more.map(n=>`<button class="${view.split(':')[0]===n[0]?'on':''}" data-act="nav" data-v="${n[0]}">${ic(n[2],16)} ${n[1]}</button>`).join('')}${folders}</div>`:''}`;
+ const cur=view.split(':')[0];
+ return groupedNav().map(([g,l])=>{
+  const on=l.some(n=>n[0]===cur)||(g[0]==='build'&&(view.startsWith('folder:')||view.startsWith('cat:'))),open=ui.menu===g[0];
+  const folders=(g[0]==='build'&&!vit()&&state.folders.length)?`<div class="menuh">Dossiers intelligents</div>${state.folders.map(f=>`<button class="mi ${view==='folder:'+f.id?'on':''}" data-act="nav" data-v="folder:${f.id}">${ic('folder',16)}<span><b>${esc(f.name)}</b></span></button>`).join('')}`:'';
+  return `<div class="menuwrap"><button class="${on?'on':''}" data-act="menu" data-g="${g[0]}" aria-haspopup="true" aria-expanded="${open}">${ic(g[2],17)}<span>${g[1]}</span>${ic('chev',11)}</button>${open?`<div class="menu glass">${l.map(n=>{const d=(MODULE_INFO[n[3]||n[0]]||[])[1]||'';return `<button class="mi ${cur===n[0]?'on':''}" data-act="nav" data-v="${n[0]}">${ic(n[2],18)}<span><b>${n[1]}</b>${d?`<small>${esc(d)}</small>`:''}</span></button>`}).join('')}${folders}</div>`:''}</div>`;
+ }).join('');
 }
 const CAT_COLORS=['#2f8a78','#3b6fd4','#8a4fbf','#c0453a','#b7791f','#d4568f','#5b6670','#2a9bb5'];
 const catItems=id=>pool().filter(i=>(i.cats||[]).includes(id));

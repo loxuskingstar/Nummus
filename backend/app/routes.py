@@ -1,14 +1,15 @@
 """API REST — contrat attendu par RestAdapter (frontend/js/store.js)."""
 import json
 import re
+import secrets
 import time
 from typing import Any
 
 import httpx
 from fastapi import APIRouter, Body, HTTPException, Request, Response
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, HTMLResponse
 
-from . import backup, config, migrations, webdav
+from . import backup, config, credentials, migrations, security, webdav
 from .db import connect
 
 router = APIRouter(prefix="/api")
@@ -63,6 +64,96 @@ def backups_download(name: str):
     if not path.is_file():
         raise HTTPException(404, "Sauvegarde introuvable")
     return FileResponse(path, media_type="application/vnd.sqlite3", filename=name)
+
+
+@router.post("/backups/{name}/restore")
+def backups_restore(name: str):
+    try:
+        return backup.restore(name)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+@router.get("/integrity")
+def integrity():
+    return backup.integrity()
+
+
+# ---------------------------------------------------------------- authentification (mot de passe modifiable)
+@router.get("/auth/status")
+def auth_status():
+    return {"enabled": bool(config.AUTH_PASSWORD), "mode": config.AUTH_MODE, "user": config.AUTH_USER}
+
+
+@router.post("/auth/password")
+def auth_password(request: Request, payload: dict = Body(...)):
+    if not config.AUTH_PASSWORD:
+        raise HTTPException(400, "L'authentification n'est pas activée")
+    ip = security.client_ip(request)
+    if security.is_blocked(ip):
+        raise HTTPException(429, "Trop de tentatives")
+    cur, new = str(payload.get("current", "")), str(payload.get("new", ""))
+    if not credentials.check(config.AUTH_USER, cur):
+        security._fails[ip].append(time.time())
+        raise HTTPException(403, "Mot de passe actuel incorrect")
+    if len(new) < 8:
+        raise HTTPException(400, "Le nouveau mot de passe doit faire au moins 8 caractères")
+    credentials.set_password(new)
+    r = Response(status_code=204)
+    if config.AUTH_MODE == "session":   # la session courante reste ouverte, les autres sont invalidées
+        r.set_cookie(security.COOKIE, security.make_token(), max_age=config.AUTH_SESSION_DAYS * 86400, httponly=True,
+                     samesite="lax", secure=request.url.scheme == "https" or request.headers.get("x-forwarded-proto") == "https", path="/")
+    return r
+
+
+# ---------------------------------------------------------------- partage en lecture seule
+MAX_SHARE = 40 * 1024 * 1024
+SHARE_CSP = "default-src 'none'; img-src data:; style-src 'unsafe-inline'; font-src data:; base-uri 'none'; form-action 'none'"
+public = APIRouter()
+
+
+@router.get("/shares")
+def shares_list():
+    with connect() as c:
+        rows = c.execute("SELECT token,user_id,kind,title,created,expires,views,length(html) FROM shares ORDER BY created DESC").fetchall()
+    return [dict(zip(("token", "user", "kind", "title", "created", "expires", "views", "bytes"), r)) for r in rows]
+
+
+@router.post("/shares", status_code=201)
+def shares_create(payload: dict = Body(...)):
+    html = payload.get("html")
+    if not isinstance(html, str) or not html.lstrip().lower().startswith("<!doctype html"):
+        raise HTTPException(400, "Page HTML attendue")
+    raw = html.encode()
+    if len(raw) > MAX_SHARE:
+        raise HTTPException(413, "Page trop volumineuse (40 Mo maximum)")
+    days = max(0, min(int(payload.get("days") or 0), 3650))
+    token, now = secrets.token_urlsafe(18), time.time()
+    with connect() as c:
+        c.execute("INSERT INTO shares(token,user_id,kind,title,html,created,expires) VALUES(?,?,?,?,?,?,?)",
+                  (token, _id(str(payload.get("user", "local"))), str(payload.get("kind", "expo"))[:20],
+                   str(payload.get("title", ""))[:200], raw, now, now + days * 86400 if days else 0))
+    return {"token": token, "path": f"/s/{token}"}
+
+
+@router.delete("/shares/{token}", status_code=204)
+def shares_delete(token: str):
+    with connect() as c:
+        c.execute("DELETE FROM shares WHERE token=?", (_id(token),))
+    return Response(status_code=204)
+
+
+@public.get("/s/{token}")
+def share_view(token: str):
+    if not ID_RE.match(token):
+        raise HTTPException(404)
+    with connect() as c:
+        r = c.execute("SELECT html,expires FROM shares WHERE token=?", (token,)).fetchone()
+        if not r or (r[1] and r[1] < time.time()):
+            raise HTTPException(404, "Lien expiré ou inconnu")
+        c.execute("UPDATE shares SET views=views+1 WHERE token=?", (token,))
+    return HTMLResponse(bytes(r[0]).decode(), headers={"Content-Security-Policy": SHARE_CSP, "X-Robots-Tag": "noindex",
+                                                       "Cache-Control": "no-store", "Referrer-Policy": "no-referrer"})
 
 
 # ---------------------------------------------------------------- profils
