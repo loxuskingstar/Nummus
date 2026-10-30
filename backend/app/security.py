@@ -11,11 +11,12 @@ from collections import defaultdict, deque
 
 from starlette.responses import HTMLResponse, RedirectResponse, Response
 
+from . import credentials
 from .config import AUTH_MAX_FAILS, AUTH_MODE, AUTH_PASSWORD, AUTH_SESSION_DAYS, AUTH_USER, AUTH_WINDOW, TRUST_PROXY
 
 # Accessibles sans identifiants : sonde de santé du conteneur et ressources d'installation PWA
 # (le navigateur les demande sans en-tête Authorization).
-PUBLIC = ("/api/health", "/manifest.webmanifest", "/icons/", "/login")
+PUBLIC = ("/api/health", "/manifest.webmanifest", "/icons/", "/login", "/s/")
 COOKIE = "nummus_session"
 
 _fails: dict[str, deque] = defaultdict(deque)   # ip -> horodatages des échecs récents
@@ -43,8 +44,7 @@ def is_blocked(ip: str, now: float | None = None) -> bool:
 
 
 def _sign(exp: int) -> str:
-    key = hashlib.sha256(f"nummus|{AUTH_USER}|{AUTH_PASSWORD}".encode()).digest()
-    return hmac.new(key, str(exp).encode(), hashlib.sha256).hexdigest()
+    return hmac.new(credentials.secret(), str(exp).encode(), hashlib.sha256).hexdigest()
 
 
 def make_token(now: float | None = None) -> str:
@@ -79,7 +79,7 @@ def _safe_next(n: str) -> str:
 
 def _login_page(err: str = "", user: str = "", nxt: str = "/", status: int = 200):
     e = f'<div class="err">{escape(err)}</div>' if err else ""
-    return HTMLResponse(LOGIN_HTML.format(err=e, user=escape(user), nxt=escape(nxt)), status_code=status)
+    return HTMLResponse(LOGIN_HTML.format(err=e, user=escape(user or AUTH_USER), nxt=escape(nxt)), status_code=status)
 
 
 def basic_auth_middleware():
@@ -106,7 +106,7 @@ def basic_auth_middleware():
         if header.lower().startswith("basic "):
             try:
                 user, _, pwd = base64.b64decode(header[6:]).decode().partition(":")
-                if secrets.compare_digest(user, AUTH_USER) & secrets.compare_digest(pwd, AUTH_PASSWORD):
+                if credentials.check(user, pwd):
                     _fails.pop(ip, None)
                     return await call_next(request)
                 _fails[ip].append(time.time())          # identifiants fournis mais faux
@@ -128,7 +128,7 @@ def basic_auth_middleware():
             return _login_page("Trop de tentatives, réessayez plus tard.", status=429)
         f = parse_qs((await request.body()).decode(errors="replace"))
         user, pwd, nxt = (f.get(k, [""])[0] for k in ("user", "password", "next"))
-        if secrets.compare_digest(user, AUTH_USER) & secrets.compare_digest(pwd, AUTH_PASSWORD):
+        if credentials.check(user, pwd):
             _fails.pop(ip, None)
             r = RedirectResponse(_safe_next(nxt), status_code=303)
             secure = request.url.scheme == "https" or request.headers.get("x-forwarded-proto") == "https"

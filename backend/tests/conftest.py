@@ -4,7 +4,7 @@ import sys
 
 import pytest
 
-MODULES = ["app.config", "app.migrations", "app.db", "app.backup", "app.security", "app.cli", "app.webdav", "app.routes", "app.main"]
+MODULES = ["app.config", "app.migrations", "app.db", "app.backup", "app.credentials", "app.security", "app.cli", "app.webdav", "app.routes", "app.main"]
 
 
 def load_app(tmp_path, **env):

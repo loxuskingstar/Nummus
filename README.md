@@ -163,3 +163,14 @@ Ajouter un tuple `(n, "description", SQL ou fonction python(conn))` à la fin de
 ## Composants tiers
 
 qrcode-generator 1.4.4 (MIT, `frontend/vendor/qrcode.js`), d3, topojson-client, KaTeX.
+
+
+## Fonctions récentes
+
+- **Connexion par session** (`NUMMUS_AUTH_MODE=session`), changement de mot de passe et déconnexion dans Réglages (le mot de passe modifié est stocké haché dans `data/auth.json`).
+- **Restauration** d'une sauvegarde depuis Réglages (une copie `pre-restore-…` de l'état courant est faite avant) et contrôle d'intégrité de la base.
+- **Liens de partage** en lecture seule pour les expositions (`/s/<jeton>`, révocables, avec expiration facultative).
+- **Historique par fiche** (depuis le journal d'opérations), **audit de la collection**, **rapport mensuel**, dossier d'assurance en un clic.
+- **Saisie et import** : tableau avec collage depuis un tableur, photos, import CSV/TSV/Excel (.xlsx) avec correspondance des colonnes, alerte de doublon.
+- **Palette de commandes** (Ctrl/⌘+K) et **interface simple / avancée**.
+- **Mode hors ligne** (mode serveur) : miroir local complet et file d'attente des écritures rejouée au retour du réseau. Pas de résolution de conflit : la dernière écriture rejouée l'emporte.

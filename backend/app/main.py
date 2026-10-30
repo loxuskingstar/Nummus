@@ -9,7 +9,7 @@ from starlette.middleware.gzip import GZipMiddleware
 
 from . import backup, db, webdav
 from .config import APP_VERSION, FRONTEND_DIR, LOG_DIR
-from .routes import router
+from .routes import public, router
 from .security import basic_auth_middleware
 
 
@@ -53,4 +53,5 @@ async def security_headers(request, call_next):
 
 app.add_middleware(GZipMiddleware, minimum_size=1000)   # JSON des fiches, JS, CSS
 app.include_router(router)
+app.include_router(public)
 app.mount("/", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")

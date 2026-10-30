@@ -13,7 +13,9 @@ function addModule(key,label,icon,desc,opts={}){
 let view='home';
 const emptyFilters=()=>({q:'',cat:'',type:'',country:'',metal:'',grade:'',yearMin:'',yearMax:'',valueMin:'',valueMax:'',tag:'',trade:false,storage:'',nostorage:false});
 const ui={menu:false,filters:emptyFilters(),sort:'recent',showFilters:false,selecting:false,picked:new Set(),lastResults:[],atlas:{type:'',wish:false,sel:null},tl:{from:null,to:null,type:'',wish:false,country:null},gloss:{q:'',letter:''}};
-const isOn=k=>!k||state.modules[k]!==false;
+/* mode simple : masque les modules avancés (les données et leurs réglages individuels sont conservés) */
+const SIMPLE_HIDE=['explore','insights','timemachine','mints','labels','expos','journal','audit','report','badges','series','quick','doubles'];
+const isOn=k=>!k||(state.modules[k]!==false&&!(state.settings&&state.settings.simple&&SIMPLE_HIDE.includes(k)));
 const navAllowed=n=>isOn(n[3])&&(!vit()||n[4]);
 const isListView=()=>view==='collection'||view==='wishlist'||view==='favorites'||view.startsWith('folder:')||view.startsWith('cat:');
 const catOf=v=>state.catalogs.find(c=>'cat:'+c.id===v);
@@ -43,10 +45,10 @@ matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change',()=>state
 const PRIMARY=['home','collection'];
 /* groupes du menu haut : un module inconnu (ajouté plus tard) tombe dans le dernier groupe */
 const NAV_GROUPS=[
- ['build','Constituer','layers',['wishlist','favorites','catalogs','series','quick','doubles']],
+ ['build','Constituer','layers',['entry','wishlist','favorites','catalogs','series','quick','doubles']],
  ['explore','Explorer','globe',['atlas','timeline','mints','explore','timemachine']],
- ['analyse','Analyser','chart',['stats','insights','badges','tools']],
- ['manage','Gérer','slots',['storage','labels','expos','journal','trash']]];
+ ['analyse','Analyser','chart',['stats','report','insights','badges','tools']],
+ ['manage','Gérer','slots',['storage','labels','expos','journal','audit','trash']]];
 const navGroupOf=k=>(NAV_GROUPS.find(g=>g[3].includes(k))||NAV_GROUPS[NAV_GROUPS.length-1])[0];
 function groupedNav(){
  const al=NAV.filter(navAllowed).filter(n=>!PRIMARY.includes(n[0])&&n[0]!=='settings');

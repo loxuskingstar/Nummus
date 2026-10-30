@@ -14,17 +14,18 @@ const reqP=r=>new Promise((res,rej)=>{r.onsuccess=()=>res(r.result);r.onerror=()
 const txDone=t=>new Promise((res,rej)=>{t.oncomplete=()=>res();t.onerror=()=>rej(t.error);t.onabort=()=>rej(t.error||new Error('abort'))});
 const stripUser=o=>{if(!o)return o;const{userId,...r}=o;return r};
 
-const IdbAdapter=(()=>{
+function makeIdb(DBN){
  let dbp=null;
  const open=()=>dbp||(dbp=new Promise((res,rej)=>{
   if(!window.indexedDB)return rej(new Error('IndexedDB indisponible'));
-  const r=indexedDB.open('nummus',4);
+  const r=indexedDB.open(DBN,5);
   r.onupgradeneeded=e=>{
    const db=r.result,tx=r.transaction;
    if(!db.objectStoreNames.contains('items')){const s=db.createObjectStore('items',{keyPath:['userId','id']});s.createIndex('byUser','userId')}
    if(!db.objectStoreNames.contains('meta'))db.createObjectStore('meta',{keyPath:['userId','key']});
    if(!db.objectStoreNames.contains('users'))db.createObjectStore('users',{keyPath:'id'});
    if(!db.objectStoreNames.contains('images'))db.createObjectStore('images',{keyPath:['userId','id']});
+   if(!db.objectStoreNames.contains('queue'))db.createObjectStore('queue',{keyPath:'seq',autoIncrement:true});
    if(!db.objectStoreNames.contains('events')){const s=db.createObjectStore('events',{keyPath:'seq',autoIncrement:true});s.createIndex('byUser','userId')}
    /* migration depuis le prototype v1 (clé unique "state" dans le store "kv") */
    if(e.oldVersion===1&&db.objectStoreNames.contains('kv')){
@@ -72,9 +73,17 @@ const IdbAdapter=(()=>{
   meta:{
    async get(uid,key){const[,s]=await store('meta');const r=await reqP(s.get([uid,key]));return r?r.value:undefined},
    async put(uid,key,value){const[t,s]=await store('meta','readwrite');s.put({userId:uid,key,value:clone(value)});return txDone(t)}
-  }
+  },
+  /* file d'attente des écritures faites hors ligne (utilisée par OfflineRest) */
+  queue:{
+   async add(e){const[t,s]=await store('queue','readwrite');s.add(e);return txDone(t)},
+   async list(){const[,s]=await store('queue');return reqP(s.getAll())},
+   async del(seq){const[t,s]=await store('queue','readwrite');s.delete(seq);return txDone(t)}
+  },
+  async destroy(){try{(await open()).close()}catch(e){}dbp=null;await new Promise(r=>{const q=indexedDB.deleteDatabase(DBN);q.onsuccess=q.onerror=q.onblocked=()=>r()})}
  };
-})();
+}
+const IdbAdapter=makeIdb('nummus');
 
 function RestAdapter(base){
  const j=async(method,path,body)=>{

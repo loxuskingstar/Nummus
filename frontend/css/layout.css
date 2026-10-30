@@ -87,3 +87,13 @@ h2.sect{font-size:22px}
  .head{align-items:flex-start}
 }
 @media(prefers-reduced-motion:reduce){*{transition:none!important}}
+/* palette de commandes */
+.pal-back{position:fixed;inset:0;z-index:90;background:rgba(0,0,0,.45);display:flex;justify-content:center;align-items:flex-start;padding:12vh 14px 0}
+.pal{width:min(620px,100%);border-radius:20px;overflow:hidden;box-shadow:var(--shadow);background:var(--surface-strong);display:flex;flex-direction:column;max-height:70vh}
+.pal input{border:0;border-bottom:1px solid var(--border);border-radius:0;background:transparent;padding:16px 18px;font-size:17px;outline:none;color:var(--text)}
+#palList{overflow:auto;padding:6px}
+.pal-i{display:flex;align-items:center;gap:12px;width:100%;border:0;background:none;padding:10px 12px;border-radius:12px;text-align:left;color:var(--text)}
+.pal-i span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.pal-i small{color:var(--muted);font-size:12px;white-space:nowrap}
+.pal-i.on,.pal-i:hover{background:color-mix(in srgb,var(--accent) 18%,transparent)}
+.pal-i .ic{color:var(--accent)}
+.pal-foot{padding:8px 16px;border-top:1px solid var(--border)}

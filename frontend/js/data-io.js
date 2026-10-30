@@ -9,7 +9,7 @@ function exportCSV(){
  download(`nummus-${slug(userName())}-${today()}.csv`,'\ufeff'+[head,...rows].map(r=>r.map(csvCell).join(';')).join('\r\n'),'text/csv;charset=utf-8');
 }
 function parseCSV(t){
- t=t.replace(/^\ufeff/,'');const first=t.split(/\r?\n/)[0]||'';const d=(first.match(/;/g)||[]).length>=(first.match(/,/g)||[]).length?';':',';
+ t=t.replace(/^\ufeff/,'');const first=t.split(/\r?\n/)[0]||'';const nc=c=>(first.match(new RegExp(c==='\t'?'\t':'\\'+c,'g'))||[]).length,d=nc('\t')>Math.max(nc(';'),nc(','))?'\t':nc(';')>=nc(',')?';':',';
  const rows=[];let r=[],c='',q=false;
  for(let i=0;i<t.length;i++){const ch=t[i];
   if(q){if(ch==='"'){if(t[i+1]==='"'){c+='"';i++}else q=false}else c+=ch}
@@ -18,6 +18,19 @@ function parseCSV(t){
   else c+=ch}
  r.push(c);if(r.some(x=>x!==''))rows.push(r);return rows;
 }
+/* convertit une cellule texte en valeur typée du champ k (partagé par l'import CSV/Excel et la saisie en lot) */
+function applyCell(it,fs,k,s){
+ if(!k||!s)return;
+ if(k==='_status'){it.status=/souhait|wish/i.test(s)?'wish':'owned';return}
+ const f=fs.find(x=>x.key===k);if(!f)return;
+ if(f.type==='number'||f.type==='money'){const v=parseFloat(s.replace(/\s/g,'').replace(',','.'));if(!isNaN(v))it[k]=v}
+ else if(f.type==='checkbox')it[k]=/^(1|oui|true|x|yes)$/i.test(s);
+ else if(f.type==='country'){const c=COUNTRIES.find(c=>norm(c.name)===norm(s)||c.id===s);if(c)it[k]=c.id}
+ else if(f.key==='type')it[k]=/billet|note/i.test(s)?'note':'coin';
+ else if(f.type==='select'){const o=optionsOf(f).find(x=>norm(x[1])===norm(s)||String(x[0])===s);it[k]=o?o[0]:s}
+ else if(f.type==='path')it[k]=normPath(s);
+ else it[k]=s;
+}
 function importCSV(text){
  const rows=parseCSV(text);if(rows.length<2){toast('CSV vide ou illisible');return}
  const fs=getFields(),head=rows[0].map(norm);
@@ -25,16 +38,7 @@ function importCSV(text){
  const out=[];
  rows.slice(1).forEach((r,n)=>{
   const it={id:uid(),type:'coin',status:'owned',created:Date.now()+n};
-  r.forEach((raw,i)=>{const k=col[i],s=String(raw||'').trim();if(!k||!s)return;
-   if(k==='_status'){it.status=/souhait|wish/i.test(s)?'wish':'owned';return}
-   const f=fs.find(x=>x.key===k);
-   if(f.type==='number'||f.type==='money'){const v=parseFloat(s.replace(/\s/g,'').replace(',','.'));if(!isNaN(v))it[k]=v}
-   else if(f.type==='checkbox')it[k]=/^(1|oui|true|x|yes)$/i.test(s);
-   else if(f.type==='country'){const c=COUNTRIES.find(c=>norm(c.name)===norm(s)||c.id===s);if(c)it[k]=c.id}
-   else if(f.key==='type')it[k]=/billet|note/i.test(s)?'note':'coin';
-   else if(f.type==='select'){const o=optionsOf(f).find(x=>norm(x[1])===norm(s)||String(x[0])===s);it[k]=o?o[0]:s}
-   else if(f.type==='path')it[k]=normPath(s);
-   else it[k]=s});
+  r.forEach((raw,i)=>applyCell(it,fs,col[i],String(raw||'').trim()));
   if(it.denomination)out.push(it);
  });
  const dups=findDups(out);
