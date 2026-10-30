@@ -21,22 +21,60 @@ function viewHome(){
  const catsBody=`<div class="cat-tiles">${cats.length?cats.slice(0,4).map(c=>catTile(c)).join(''):'<p class="muted small">Regroupez vos entrées en catalogues libres ou en coffrets.</p>'}</div>`;
  const codes=lists.currencies(),mrows=METAL_CLASSES.filter(([k])=>mp.r[k].g>0).map(([k,l])=>{const g=mp.r[k].g,p=+pr[k];return `<div class="mrow"><span>${l}</span><span class="muted">${nf1(g)} g</span><b>${p?fmtMoney(g/31.1035*p):'<span class="muted">cours ?</span>'}</b></div>`}).join('');
  const fx=`<div class="fx"><div class="fxb"><label>De</label><input type="number" step="any" min="0" value="${FX.amt}" data-in="fxamt" aria-label="Montant"><select data-ch="fxfrom" aria-label="Devise source">${codes.map(c=>`<option ${c===FX.from?'selected':''}>${c}</option>`).join('')}</select></div><button class="fxs" data-act="fxswap" aria-label="Inverser">${ic('repeat',16)}</button><div class="fxb"><label>Vers</label><div class="out" id="fx_out">—</div><select data-ch="fxto" aria-label="Devise cible">${codes.map(c=>`<option ${c===FX.to?'selected':''}>${c}</option>`).join('')}</select></div></div><p class="muted small" id="fx_note" style="margin-top:8px"></p>`;
- return `<header class="head"><div><p class="eyebrow">${esc(date)}</p><h1>${esc(userName())}</h1></div><div class="actions">${v?'':`<button class="btn" data-act="nav" data-v="wishlist">${ic('star',16)} ${pl(wish,'souhait','souhaits')}</button><button class="btn primary" data-act="add">${ic('plus',16)} Ajouter</button>`}</div></header>
+ const H={v,hv,L,tot,nc,wish,val,paid,mp,pr,bars,recent,catsBody,mrows,fx,f,rec};
+ const edit=!!ui.homeEdit&&!v;
+ return `<header class="head"><div><p class="eyebrow">${esc(date)}</p><h1>${esc(userName())}</h1></div><div class="actions">${v?'':`<button class="btn ${edit?'primary':''}" data-act="homeEdit">${ic(edit?'check':'sliders',16)} ${edit?'Terminé':'Personnaliser'}</button><button class="btn" data-act="nav" data-v="wishlist">${ic('star',16)} ${pl(wish,'souhait','souhaits')}</button><button class="btn primary" data-act="add">${ic('plus',16)} Ajouter</button>`}</div></header>
  <div class="kpis2">${k.join('')}</div>
- ${v?'':EXT.home.map(fn=>{try{return fn()}catch(e){console.error(e);return''}}).join('')}
- <div class="dash">
-  <section class="dcard glass d-map"><h3 class="wh"><span>${ic('globe',14)} Atlas</span>${moreLink('atlas','Ouvrir')}</h3><div class="map mini" id="homemap"></div></section>
-  ${dcard('Derniers ajouts','clock',recent,moreLink('collection'))}
-  ${dcard('Pays les mieux représentés','chart',bars,moreLink('stats','Stats'))}
-  ${dcard('Catalogues','book',catsBody,moreLink('catalogs'))}
-  ${(!hv&&mrows)?dcard('Métaux précieux','coin',`<div class="mlist">${mrows}</div>`,moreLink('stats','Détails')):''}
-  ${dcard('Convertisseur','refresh',fx)}
-  ${f?`<section class="dcard glass d-feat"><h3 class="wh"><span>${ic('star',14)} À l’honneur</span></h3><button class="feat" data-act="open" data-id="${f.id}"><img src="${esc(f.cover)}" alt=""><span><b>${esc(f.denomination)}</b><small class="muted">${esc(subtitle(f))}</small></span></button></section>`:''}
- </div>`;
+ ${(v||homeHidden('daily'))?'':EXT.home.map(fn=>{try{return fn()}catch(e){console.error(e);return''}}).join('')}
+ ${edit?homeTray(H):''}
+ ${homeDash(H,edit)}`;
 }
-function afterHome(){const data=atlasData();mountMap($('#homemap'),{info:c=>data[c],tip:tipHTML,onClick:()=>go('atlas')});fxLoad()}
+/* ---------- tableau de bord à widgets : ordre et visibilité mémorisés dans les réglages (settings.dash) ---------- */
+const HOME_W=[];                                   // {id,title,icon,span,rows,link,when,body,off}
+function homeWidget(d){if(!HOME_W.some(w=>w.id===d.id))HOME_W.push({span:4,...d})}
+const homeHidden=id=>{const d=state.settings.dash,w=HOME_W.find(x=>x.id===id);return(d.hidden||[]).includes(id)||(w&&w.off&&!(d.shown||[]).includes(id))};
+function homeLayout(){
+ const d=state.settings.dash,saved=(d.order||[]).filter(id=>HOME_W.some(w=>w.id===id));
+ return[...saved,...HOME_W.map(w=>w.id).filter(id=>!saved.includes(id))].map(id=>HOME_W.find(w=>w.id===id));
+}
+function homeDash(H,edit){
+ const cards=homeLayout().filter(w=>!homeHidden(w.id)&&(!w.when||w.when(H))).map(w=>{
+  let body='';try{body=w.body(H)}catch(e){console.error(e);body='<p class="muted small">Widget indisponible.</p>'}
+  const ctl=edit?`<span class="hwctl"><button class="x" data-act="hwMove" data-id="${w.id}" data-d="-1" aria-label="Monter">${ic('up',14)}</button><button class="x" data-act="hwMove" data-id="${w.id}" data-d="1" aria-label="Descendre">${ic('down',14)}</button><button class="x" data-act="hwHide" data-id="${w.id}" aria-label="Masquer">${ic('x',14)}</button></span>`:'';
+  const head=`<h3 class="wh"><span>${edit?`<span class="hwgrip" title="Glisser pour déplacer">${ic('drag',14)}</span> `:''}${ic(w.icon,14)} ${w.title}</span>${edit?ctl:(w.link?w.link():'')}</h3>`;
+  return `<section class="dcard glass hw ${w.cls||''}" data-w="${w.id}" ${edit?'draggable="true"':''} style="--sp:${w.span};--rw:${w.rows||1}">${head}${body}</section>`;
+ }).join('');
+ return `<div class="dash ${edit?'editing':''}" id="dash">${cards}</div>`;
+}
+function homeTray(H){
+ const hid=HOME_W.filter(w=>homeHidden(w.id)&&(!w.when||w.when(H)||w.off)),daily=homeHidden('daily');
+ return `<section class="panel glass" style="margin-bottom:14px"><h3>Widgets disponibles</h3><p class="muted small" style="margin-bottom:8px">Glissez les cartes pour les réordonner (ou utilisez les flèches), masquez avec la croix, ajoutez ci-dessous.</p>
+ <div class="chips">${hid.map(w=>`<button class="chip" data-act="hwShow" data-id="${w.id}">${ic('plus',12)} ${w.title}</button>`).join('')||'<span class="muted small">Tous les widgets sont affichés.</span>'}${daily?`<button class="chip" data-act="hwShow" data-id="daily">${ic('plus',12)} Pièce du jour</button>`:`<button class="chip" data-act="hwHide" data-id="daily">${ic('x',12)} Masquer la pièce du jour</button>`}</div>
+ <div class="actions" style="margin-top:8px"><button class="btn sm" data-act="hwReset">Rétablir la disposition d’origine</button></div></section>`;
+}
+function hwSave(){savePrefs();render()}
+/* glisser-déposer natif (ordinateur) ; sur mobile, les flèches font la même chose */
+let HW_DRAG=null;
+document.addEventListener('dragstart',e=>{const c=e.target.closest&&e.target.closest('.hw[draggable=true]');if(!c)return;HW_DRAG=c.dataset.w;e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',HW_DRAG);c.classList.add('hwdrag')});
+document.addEventListener('dragover',e=>{const c=e.target.closest&&e.target.closest('.hw');if(c&&HW_DRAG){e.preventDefault();$$('.hwover').forEach(x=>x.classList.remove('hwover'));if(c.dataset.w!==HW_DRAG)c.classList.add('hwover')}});
+document.addEventListener('dragend',()=>{HW_DRAG=null;$$('.hwdrag,.hwover').forEach(x=>x.classList.remove('hwdrag','hwover'))});
+document.addEventListener('drop',e=>{
+ const c=e.target.closest&&e.target.closest('.hw');if(!c||!HW_DRAG)return;e.preventDefault();
+ const ids=homeLayout().map(w=>w.id),from=ids.indexOf(HW_DRAG),to=ids.indexOf(c.dataset.w);
+ if(from>=0&&to>=0&&from!==to){ids.splice(to,0,ids.splice(from,1)[0]);state.settings.dash.order=ids;HW_DRAG=null;hwSave()}
+});
+
+/* widgets d'origine */
+homeWidget({id:'map',title:'Atlas',icon:'globe',span:8,rows:2,cls:'d-map',link:()=>moreLink('atlas','Ouvrir'),body:()=>'<div class="map mini" id="homemap"></div>'});
+homeWidget({id:'recent',title:'Derniers ajouts',icon:'clock',link:()=>moreLink('collection'),body:H=>H.recent});
+homeWidget({id:'countries',title:'Pays les mieux représentés',icon:'chart',link:()=>moreLink('stats','Stats'),body:H=>H.bars});
+homeWidget({id:'cats',title:'Catalogues',icon:'book',link:()=>moreLink('catalogs'),body:H=>H.catsBody});
+homeWidget({id:'metals',title:'Métaux précieux',icon:'coin',link:()=>moreLink('stats','Détails'),when:H=>!H.hv&&!!H.mrows,body:H=>`<div class="mlist">${H.mrows}</div>`});
+homeWidget({id:'fx',title:'Convertisseur',icon:'refresh',body:H=>H.fx});
+homeWidget({id:'feat',title:'À l’honneur',icon:'star',when:H=>!!H.f,cls:'d-feat',body:H=>{const f=H.f;return `<button class="feat" data-act="open" data-id="${f.id}"><img src="${esc(f.cover)}" alt=""><span><b>${esc(f.denomination)}</b><small class="muted">${esc(subtitle(f))}</small></span></button>`}});
+function afterHome(){if($('#homemap')){const data=atlasData();mountMap($('#homemap'),{info:c=>data[c],tip:tipHTML,onClick:()=>go('atlas')})}if($('#fx_out'))fxLoad();}
 async function fxLoad(){
- if(!$('#fxw'))return;FX.rate=null;FX.err=false;fxPaint();
+ if(!$('#fx_out'))return;FX.rate=null;FX.err=false;fxPaint();
  if(FX.from===FX.to){FX.rate=1;fxPaint();return}
  try{const r=await fetch(`https://api.frankfurter.app/latest?from=${encodeURIComponent(FX.from)}&to=${encodeURIComponent(FX.to)}`);if(!r.ok)throw new Error('HTTP');const j=await r.json();FX.rate=j.rates&&j.rates[FX.to]||null;FX.err=!FX.rate}catch(e){FX.rate=null;FX.err=true}
  fxPaint();

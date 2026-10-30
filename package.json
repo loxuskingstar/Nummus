@@ -1,0 +1,11 @@
+{
+  "name": "nummus-frontend-tools",
+  "private": true,
+  "scripts": {
+    "test": "node --test frontend/tests/*.test.js",
+    "globals": "node tools/gen-globals.js",
+    "lint": "npm run globals && eslint frontend/js",
+    "format": "prettier --write"
+  },
+  "devDependencies": { "eslint": "^9.0.0", "prettier": "^3.0.0" }
+}

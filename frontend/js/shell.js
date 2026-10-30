@@ -3,7 +3,7 @@
 const NAV=[['home','Accueil','home',null,1],['collection','Collection','grid',null,1],['wishlist','Wishlist','star','wishlist',0],['catalogs','Catalogues','book','catalogs',1],['atlas','Atlas','globe','atlas',1],['timeline','Chronologie','clock','timeline',1],['stats','Statistiques','chart','stats',1],['doubles','Doublons et échanges','repeat','doubles',0],['storage','Rangement','layers','storage',0],['tools','Outils et glossaire','calc','tools',1],['settings','Réglages','sliders',null,0]];
 const MODULE_INFO={catalogs:['Catalogues','Collections numériques libres, coffrets et séries complètes.'],wishlist:['Wishlist','Pièces et billets à acquérir, avec priorité et prix cible.'],atlas:['Atlas','Carte du monde : les pays de votre collection s’illuminent.'],timeline:['Chronologie','Frise par époque, avec carte des origines.'],stats:['Statistiques','Répartitions, investissement, valeur et portefeuille métaux.'],doubles:['Doublons et échanges','Exemplaires multiples, objets à échanger, doublons probables.'],storage:['Rangement','Arborescence hiérarchique des emplacements.'],tools:['Outils et glossaire','Calendriers, métaux, chiffres romains, grades, lexique.']};
 /* registre d'extension : les modules (js/feat-*.js) y déclarent vues, rendus différés, widgets et sections de fiche */
-const EXT={views:{},after:{},detail:[],home:[],settings:[]};
+const EXT={views:{},after:{},detail:[],home:[],settings:[],beforeSave:[],lightbox:[],tools:[]};
 function addModule(key,label,icon,desc,opts={}){
  const at=opts.after?NAV.findIndex(n=>n[0]===opts.after)+1:NAV.length-1;
  NAV.splice(at>0?at:NAV.length-1,0,[key,label,icon,opts.module===undefined?key:opts.module,opts.vit?1:0]);

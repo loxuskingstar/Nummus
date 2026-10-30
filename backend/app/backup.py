@@ -10,10 +10,11 @@ from .config import BACKUP_DIR, BACKUP_EVERY_HOURS, BACKUP_KEEP, DB_PATH
 
 log = logging.getLogger("nummus.backup")
 NAME_RE = re.compile(r"^[A-Za-z0-9_.\-]{1,120}\.sqlite3$")
+AUTO_RE = re.compile(r"^nummus-\d{8}-\d{6}\.sqlite3$")   # sauvegardes automatiques ; « manuel-… » et « pre-migration-… » sont conservées
 
 
 def _changed_since_last() -> bool:
-    files = sorted(BACKUP_DIR.glob("nummus-*.sqlite3"))
+    files = sorted(p for p in BACKUP_DIR.glob("nummus-*.sqlite3") if AUTO_RE.match(p.name))
     if not files:
         return True
     last = files[-1].stat().st_mtime
@@ -38,8 +39,9 @@ def run_backup(label: str = "nummus") -> str:
 
 
 def rotate() -> None:
-    """Ne conserve que les BACKUP_KEEP dernières sauvegardes automatiques (les « pre-migration-… » sont gardées)."""
-    for old in sorted(BACKUP_DIR.glob("nummus-*.sqlite3"))[:-BACKUP_KEEP or None]:
+    """Ne conserve que les BACKUP_KEEP dernières sauvegardes automatiques (les « manuel-… » et « pre-migration-… » sont gardées)."""
+    autos = sorted(p for p in BACKUP_DIR.glob("nummus-*.sqlite3") if AUTO_RE.match(p.name))
+    for old in autos[:-BACKUP_KEEP or None]:
         old.unlink(missing_ok=True)
 
 

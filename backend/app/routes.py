@@ -8,7 +8,7 @@ import httpx
 from fastapi import APIRouter, Body, HTTPException, Request, Response
 from fastapi.responses import FileResponse
 
-from . import backup, config, migrations
+from . import backup, config, migrations, webdav
 from .db import connect
 
 router = APIRouter(prefix="/api")
@@ -41,7 +41,7 @@ def info():
                   for t in ("users", "items", "images", "meta", "events")}
         schema = migrations.current(c)
     return {"app": config.APP_VERSION, "schema": schema, "schema_latest": migrations.LATEST, "counts": counts,
-            "backups": len(backup.listing())}
+            "backups": len(backup.listing()), "webdav": webdav.status()}
 
 
 # ---------------------------------------------------------------- sauvegardes de la base
@@ -52,7 +52,7 @@ def backups_list():
 
 @router.post("/backups", status_code=201)
 def backups_create():
-    return {"name": backup.run_backup("nummus-manuel")}
+    return {"name": backup.run_backup("manuel")}
 
 
 @router.get("/backups/{name}")
@@ -254,7 +254,8 @@ def image_get(uid: str, iid: str):
         r = c.execute("SELECT mime,data FROM images WHERE user_id=? AND id=?", (uid, iid)).fetchone()
     if not r:
         raise HTTPException(404, "Image introuvable")
-    return Response(content=r[1], media_type=r[0], headers={"Cache-Control": "private, max-age=86400"})
+    return Response(content=r[1], media_type=r[0], headers={
+        "Cache-Control": "private, max-age=86400", "Content-Security-Policy": "sandbox", "X-Content-Type-Options": "nosniff"})
 
 
 @router.put("/users/{uid}/images/{iid}", status_code=204)
@@ -265,9 +266,9 @@ async def image_put(uid: str, iid: str, request: Request):
         raise HTTPException(400, "Image vide")
     if len(body) > config.MAX_IMAGE_BYTES:
         raise HTTPException(413, "Image trop volumineuse")
-    mime = (request.headers.get("content-type") or "application/octet-stream").split(";")[0].strip()
-    if not mime.startswith("image/"):
-        mime = "application/octet-stream"
+    mime = (request.headers.get("content-type") or "").split(";")[0].strip().lower()
+    if mime not in config.ALLOWED_BLOB_TYPES:   # liste blanche : pas de SVG ni de HTML servis depuis notre origine
+        raise HTTPException(415, "Type de fichier non accepté (images JPEG/PNG/WebP/GIF/AVIF ou PDF)")
     with connect() as c:
         c.execute("INSERT INTO images(user_id,id,mime,data) VALUES(?,?,?,?) "
                   "ON CONFLICT(user_id,id) DO UPDATE SET mime=excluded.mime, data=excluded.data", (uid, iid, mime, body))
@@ -291,18 +292,31 @@ def images_clear(uid: str):
 
 
 # ---------------------------------------------------------------- intégrations externes
+_numista_cache: dict = {}   # (chemin, requête) -> (horodatage, contenu, type) ; réponses 200 uniquement
+NUMISTA_CACHE_MAX = 500
+
+
 @router.get("/numista/{path:path}")
 async def numista_proxy(path: str, request: Request):
-    """Relais vers l'API Numista : la clé reste côté serveur (NUMISTA_API_KEY)."""
+    """Relais vers l'API Numista : la clé reste côté serveur (NUMISTA_API_KEY). Réponses gardées NUMISTA_TTL secondes
+    (Numista limite le nombre d'appels)."""
     if not config.NUMISTA_API_KEY:
         raise HTTPException(503, "NUMISTA_API_KEY n'est pas configurée sur le serveur")
     if ".." in path:
         raise HTTPException(400, "Chemin invalide")
+    key = (path, tuple(sorted(request.query_params.multi_items())))
+    hit = _numista_cache.get(key)
+    if hit and time.time() - hit[0] < config.NUMISTA_TTL:
+        return Response(content=hit[1], media_type=hit[2], headers={"X-Nummus-Cache": "hit"})
     async with httpx.AsyncClient(timeout=20) as cl:
         r = await cl.get(f"{config.NUMISTA_BASE.rstrip('/')}/{path}", params=dict(request.query_params),
                          headers={"Numista-API-Key": config.NUMISTA_API_KEY})
-    return Response(content=r.content, status_code=r.status_code,
-                    media_type=r.headers.get("content-type", "application/json"))
+    mt = r.headers.get("content-type", "application/json")
+    if r.status_code == 200:
+        if len(_numista_cache) >= NUMISTA_CACHE_MAX:
+            _numista_cache.pop(min(_numista_cache, key=lambda k: _numista_cache[k][0]), None)
+        _numista_cache[key] = (time.time(), r.content, mt)
+    return Response(content=r.content, status_code=r.status_code, media_type=mt)
 
 
 _prices: dict = {"t": 0.0, "cur": "", "v": None}

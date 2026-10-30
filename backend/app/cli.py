@@ -38,11 +38,11 @@ def cmd_migrate(_):
 
 def cmd_backup(_):
     db.init()
-    print(backup.run_backup("nummus-manuel"))
+    print(backup.run_backup("manuel"))
 
 
-def cmd_dump(a):
-    db.init()
+def build_dump() -> dict:
+    """Document JSON complet (tous les profils, images comprises), indépendant de SQLite."""
     users = []
     with connect() as c:
         for (uid, udata) in c.execute("SELECT id,data FROM users ORDER BY rowid").fetchall():
@@ -55,11 +55,16 @@ def cmd_dump(a):
                            for i, m, d in c.execute("SELECT id,mime,data FROM images WHERE user_id=?", (uid,))]
             users.append(u)
         schema = migrations.current(c)
-    doc = {"format": FORMAT, "dump_version": DUMP_VERSION, "app": APP_VERSION, "schema": schema,
-           "exported_at": datetime.now(timezone.utc).isoformat(), "users": users}
+    return {"format": FORMAT, "dump_version": DUMP_VERSION, "app": APP_VERSION, "schema": schema,
+            "exported_at": datetime.now(timezone.utc).isoformat(), "users": users}
+
+
+def cmd_dump(a):
+    db.init()
+    doc = build_dump()
     with open(a.file, "w", encoding="utf-8") as f:
         json.dump(doc, f, ensure_ascii=False)
-    print(f"{len(users)} profil(s) exporté(s) dans {a.file}")
+    print(f"{len(doc['users'])} profil(s) exporté(s) dans {a.file}")
 
 
 def cmd_load(a):

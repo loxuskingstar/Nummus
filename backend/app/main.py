@@ -5,8 +5,9 @@ from logging.handlers import RotatingFileHandler
 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
+from starlette.middleware.gzip import GZipMiddleware
 
-from . import backup, db
+from . import backup, db, webdav
 from .config import APP_VERSION, FRONTEND_DIR, LOG_DIR
 from .routes import router
 from .security import basic_auth_middleware
@@ -29,6 +30,7 @@ async def lifespan(_: FastAPI):
     schema = db.init()
     logging.getLogger("nummus").info("Nummus %s démarré (schéma %s)", APP_VERSION, schema)
     backup.start()
+    webdav.start()
     yield
 
 
@@ -37,5 +39,18 @@ app = FastAPI(title="Nummus", version=APP_VERSION, docs_url="/api/docs", openapi
 _auth = basic_auth_middleware()
 if _auth:
     app.middleware("http")(_auth)
+
+
+@app.middleware("http")
+async def security_headers(request, call_next):
+    """En-têtes posés sur toutes les réponses (sans écraser ceux déjà définis par une route)."""
+    r = await call_next(request)
+    r.headers.setdefault("X-Content-Type-Options", "nosniff")
+    r.headers.setdefault("X-Frame-Options", "DENY")
+    r.headers.setdefault("Referrer-Policy", "same-origin")
+    return r
+
+
+app.add_middleware(GZipMiddleware, minimum_size=1000)   # JSON des fiches, JS, CSS
 app.include_router(router)
 app.mount("/", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")

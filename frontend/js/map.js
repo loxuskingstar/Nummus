@@ -66,7 +66,7 @@ function atlasData(){
   const o=d[i.country]||(d[i.country]={code:i.country,coins:0,notes:0,wish:0,min:null,max:null,value:0,items:[],count:0});
   o.count++;o.items.push(i);
   if(i.status==='wish')o.wish++;else if(i.type==='note')o.notes++;else o.coins++;
-  if(hasYear(i)){const y=+i.year;o.min=o.min===null?y:Math.min(o.min,y);o.max=o.max===null?y:Math.max(o.max,y)}
+  if(hasYear(i)){const y=+i.year,y2=(!isEmpty(i.yearEnd)&&+i.yearEnd>y)?+i.yearEnd:y;o.min=o.min===null?y:Math.min(o.min,y);o.max=o.max===null?y2:Math.max(o.max,y2)}
   if(i.status!=='wish')o.value+=(+i.value||0)*qtyOf(i);
  });
  return d;

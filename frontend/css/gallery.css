@@ -24,3 +24,8 @@
 button.link{background:none;border:0;padding:0;text-decoration:underline;color:var(--accent);font-size:inherit}
 .sentinel{height:1px}
 @media(pointer:coarse){#results .card,#results .row{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}}
+.lbtools{display:flex;flex-direction:column;gap:6px;padding:6px 14px;background:rgba(0,0,0,.55)}
+.lbtools .actions{flex-wrap:wrap;gap:8px;align-items:center}.lbtools input[type=range]{vertical-align:middle;width:140px}
+.lbtools .sw{width:22px;height:22px}
+.lbstage svg.lbl2,.lbstage canvas.lbl2{position:absolute;left:50%;top:50%;transform-origin:center;max-width:none}
+.lbstage canvas.lbl2{pointer-events:none}

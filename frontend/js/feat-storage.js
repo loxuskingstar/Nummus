@@ -20,6 +20,7 @@ EXT.after.settings=async()=>{
  try{
   const i=await (await fetch(base+'/info')).json(),b=await (await fetch(base+'/backups')).json();
   $('#srvinfo').textContent=`Nummus ${i.app} · base v${i.schema}${i.schema!==i.schema_latest?` (v${i.schema_latest} disponible)`:''} · ${i.counts.items} fiches, ${i.counts.images} images, ${i.counts.events} événements`;
+  const w=i.webdav,dv=$('#davsrv');if(dv)dv.textContent=w&&w.enabled?`actif${w.last?', dernier envoi '+new Date(w.last*1000).toLocaleString('fr-FR'):', aucun envoi pour l’instant'}${w.error?' (erreur : '+w.error+')':''}`:'non configuré';
   $('#srvbk').innerHTML=b.length?`${b.length} fichier${b.length>1?'s':''} · dernier : <a class="link" href="${base}/backups/${encodeURIComponent(b[0].name)}">${esc(b[0].name)}</a>`:'aucune pour l’instant';
  }catch(e){const a=$('#srvinfo');if(a)a.textContent='indisponible'}
 };

@@ -53,7 +53,7 @@ function filterPanel(st,folder){
 }
 const thumbSrc=it=>it.cover||'';
 function thumb(it,s=36){const src=thumbSrc(it);return src?`<img src="${esc(src)}" alt="" loading="lazy">`:`<span class="ph">${ic(it.type==='note'?'note':'coin',s)}</span>`}
-function subtitle(it){return[cname(it.country)||it.issuer,fmtYear(it.year)].filter(Boolean).join(', ')}
+function subtitle(it){return[cname(it.country)||it.issuer,yearSpan(it),it.attribution].filter(Boolean).join(', ')}
 const prioLabel=p=>({3:'Priorité haute',2:'Priorité moyenne',1:'Priorité basse'})[+p]||'';
 function priceOf(it){if(hideVals())return'';const w=it.status==='wish';return w?(!isEmpty(it.target)?'Cible '+fmtMoney(it.target):''):(!isEmpty(it.value)?fmtMoney(it.value):'')}
 function card(it){
@@ -66,7 +66,7 @@ function card(it){
 function rowOf(it){
  const w=it.status==='wish',p=ui.picked.has(it.id),sel=ui.selecting&&isListView();
  const price=hideVals()?'':(w?fmtMoney(it.target):fmtMoney(it.value));
- return `<div class="row ${p&&sel?'picked':''}" data-act="open" data-id="${it.id}" tabindex="0">${sel?`<span class="pick">${p?ic('check',13):''}</span>`:`<span class="mini">${thumb(it,20)}</span>`}<b>${it.fav?`<span class="favi">${ic('heartf',12)}</span> `:''}${esc(it.denomination)}</b><span class="muted">${esc(cname(it.country)||it.issuer||'')}</span><span>${esc(fmtYear(it.year))}</span><span>${w?'<span class="muted">souhait</span>':esc(it.grade||'')}${it.rarity&&it.rarity!=='C'?` <span class="rar r-${esc(it.rarity)}">${esc(it.rarity)}</span>`:''}</span><span class="r">${price}</span></div>`;
+ return `<div class="row ${p&&sel?'picked':''}" data-act="open" data-id="${it.id}" tabindex="0">${sel?`<span class="pick">${p?ic('check',13):''}</span>`:`<span class="mini">${thumb(it,20)}</span>`}<b>${it.fav?`<span class="favi">${ic('heartf',12)}</span> `:''}${esc(it.denomination)}</b><span class="muted">${esc(cname(it.country)||it.issuer||'')}</span><span>${esc(yearSpan(it))}</span><span>${w?'<span class="muted">souhait</span>':esc(it.grade||'')}${it.rarity&&it.rarity!=='C'?` <span class="rar r-${esc(it.rarity)}">${esc(it.rarity)}</span>`:''}</span><span class="r">${price}</span></div>`;
 }
 function renderResults(){
  const el=$('#results');if(!el)return;
@@ -161,7 +161,7 @@ async function openDetail(id){
  const histHTML=(w||hideVals())?'':`<section class="vhist"><h3>Historique de la valeur estimée</h3>${hist.length?histChart(hist):'<p class="muted small" style="margin-top:6px">Aucun point pour l’instant. Chaque modification de la valeur estimée en ajoute un automatiquement.</p>'}
   ${v?'':`<div class="hadd"><input type="date" id="h_d" value="${today()}" aria-label="Date"><input type="number" step="any" id="h_v" placeholder="Valeur (${esc(state.settings.currency)})" aria-label="Valeur"><button class="btn sm" data-act="histAdd" data-id="${it.id}">${ic('plus',14)} Point</button></div>
   ${hist.length?`<details style="margin-top:8px"><summary class="muted small">Gérer les points (${hist.length})</summary>${hist.map((p,i)=>`<div class="hrow"><span>${esc(dateFR(p.date))}</span><b>${fmtMoney(p.value)}</b><button class="x" data-act="histDel" data-id="${it.id}" data-i="${i}" aria-label="Supprimer">${ic('trash',15)}</button></div>`).join('')}</details>`:''}`}</section>`;
- openModal(`<div class="mhead"><div><h2>${esc(it.denomination)}</h2><p class="muted">${esc([it.type==='note'?'Billet':'Pièce',cname(it.country),fmtYear(it.year)].filter(Boolean).join(', '))}${w?' — dans la wishlist':''}</p></div><div class="actions">${v?'':`<button class="x favx ${it.fav?'on':''}" data-act="fav" data-id="${it.id}" title="Favori" aria-label="Favori">${ic(it.fav?'heartf':'heart',20)}</button>`}<button class="x" data-act="share" data-id="${it.id}" title="Partager en image" aria-label="Partager">${ic('share',20)}</button><button class="x" data-act="close" aria-label="Fermer">${ic('x',22)}</button></div></div>
+ openModal(`<div class="mhead"><div><h2>${esc(it.denomination)}</h2><p class="muted">${esc([it.type==='note'?'Billet':'Pièce',cname(it.country),yearSpan(it),it.attribution].filter(Boolean).join(', '))}${w?' — dans la wishlist':''}</p></div><div class="actions">${v?'':`<button class="x favx ${it.fav?'on':''}" data-act="fav" data-id="${it.id}" title="Favori" aria-label="Favori">${ic(it.fav?'heartf':'heart',20)}</button>`}<button class="x" data-act="share" data-id="${it.id}" title="Partager en image" aria-label="Partager">${ic('share',20)}</button><button class="x" data-act="close" aria-label="Fermer">${ic('x',22)}</button></div></div>
  <div class="dgrid"><div class="dimgs">${mFront?zoomImg(mFront.id,roleLabel(it,mFront.role==='front'?'front':'other'),it.id):`<div class="ph">${ic(it.type==='note'?'note':'coin',56)}</div>`}${mBack?zoomImg(mBack.id,roleLabel(it,'back'),it.id):''}${mRest.length?`<div class="thumbs">${mRest.map(m=>`<button class="tbtn" data-act="lightbox" data-id="${it.id}" data-m="${m.id}"><img src="${esc(imgSync(m.id))}" alt=""><small>${esc(m.cap||roleLabel(it,m.role))}</small></button>`).join('')}</div>`:''}${imgs.length?'<p class="muted small">Survolez pour la loupe · cliquez pour le plein écran</p>':''}</div>
  <div>${tags.length?`<div class="chips">${tags.map(t=>`<span class="chip acc">${esc(t)}</span>`).join('')}</div>`:''}
  <dl class="facts">${rows.map(r=>`<dt>${esc(r[0])}</dt><dd>${r[1]}</dd>`).join('')}</dl>

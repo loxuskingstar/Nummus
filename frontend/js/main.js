@@ -12,5 +12,6 @@ if('serviceWorker' in navigator&&/^https?:$/.test(location.protocol)){window.add
  let id=lsGet('nummus.user',null);if(!users.some(u=>u.id===id))id=users[0].id;
  await loadUser(id);
  render();
+ if(typeof openFromHash==='function')openFromHash();
  setInterval(checkBackup,36e5);
 })();

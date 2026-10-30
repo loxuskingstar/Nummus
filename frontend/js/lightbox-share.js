@@ -7,12 +7,13 @@ function openLightbox(itemId,mid){
  $('#lb').hidden=false;document.body.style.overflow='hidden';lbShow();
 }
 function closeLB(){LB=null;const e=$('#lb');e.hidden=true;e.innerHTML='';if($('#modal').hidden&&$('#modal2').hidden)document.body.style.overflow=''}
-function lbApply(){const im=$('#lbimg');if(im&&LB)im.style.transform=`translate(-50%,-50%) translate(${LB.x}px,${LB.y}px) scale(${LB.s})`}
-function lbFit(){const st=$('#lbst'),im=$('#lbimg');if(!LB||!st||!im||!im.naturalWidth)return;im.style.width=im.naturalWidth+'px';im.style.height=im.naturalHeight+'px';LB.fit=Math.min(st.clientWidth/im.naturalWidth,st.clientHeight/im.naturalHeight);LB.s=LB.fit;LB.x=LB.y=0;lbApply()}
+function lbApply(){if(!LB)return;const t=`translate(-50%,-50%) translate(${LB.x}px,${LB.y}px) scale(${LB.s})`;$$('#lbst>.lbl2').forEach(e=>e.style.transform=t)}
+function lbFit(){const st=$('#lbst'),im=$('#lbimg');if(!LB||!st||!im||!im.naturalWidth)return;$$('#lbst>.lbl2').forEach(e=>{e.style.width=im.naturalWidth+'px';e.style.height=im.naturalHeight+'px'});LB.fit=Math.min(st.clientWidth/im.naturalWidth,st.clientHeight/im.naturalHeight);LB.s=LB.fit;LB.x=LB.y=0;lbApply()}
 function lbZoom(f,cx=0,cy=0){if(!LB)return;const s=Math.min(Math.max(LB.s*f,LB.fit),Math.max(8,LB.fit*8)),r=s/LB.s;LB.x=cx-(cx-LB.x)*r;LB.y=cy-(cy-LB.y)*r;LB.s=s;if(s<=LB.fit*1.001)LB.x=LB.y=0;lbApply()}
 function lbShow(){
  const m=LB.imgs[LB.i],el=$('#lb');
- el.innerHTML=`<div class="lbstage" id="lbst"><img id="lbimg" src="${esc(imgSync(m.id))}" alt="" draggable="false"></div><div class="lbbar"><span>${esc(m.cap||roleLabel(LB.it,m.role))} · ${LB.i+1}/${LB.imgs.length}</span><div class="actions"><button class="btn sm" data-act="lbz" data-d="1.4" aria-label="Zoom avant">${ic('plus',16)}</button><button class="btn sm" data-act="lbz" data-d="0.71" aria-label="Zoom arrière">−</button><button class="btn sm" data-act="lbreal">100 %</button><button class="btn sm" data-act="lbfit">Ajuster</button><button class="btn sm" data-act="lbclose" aria-label="Fermer">${ic('x',16)}</button></div></div>${LB.imgs.length>1?`<button class="lbnav l" data-act="lbnav" data-d="-1" aria-label="Précédente">‹</button><button class="lbnav r" data-act="lbnav" data-d="1" aria-label="Suivante">›</button>`:''}`;
+ el.innerHTML=`<div class="lbstage" id="lbst"><img id="lbimg" class="lbl2" src="${esc(imgSync(m.id))}" alt="" draggable="false"></div><div class="lbbar"><span>${esc(m.cap||roleLabel(LB.it,m.role))} · ${LB.i+1}/${LB.imgs.length}</span><div class="actions"><button class="btn sm" data-act="lbz" data-d="1.4" aria-label="Zoom avant">${ic('plus',16)}</button><button class="btn sm" data-act="lbz" data-d="0.71" aria-label="Zoom arrière">−</button><button class="btn sm" data-act="lbreal">100 %</button><button class="btn sm" data-act="lbfit">Ajuster</button>${EXT.lightbox.map(h=>h.bar?h.bar(m):'').join('')}<button class="btn sm" data-act="lbclose" aria-label="Fermer">${ic('x',16)}</button></div></div>${LB.imgs.length>1?`<button class="lbnav l" data-act="lbnav" data-d="-1" aria-label="Précédente">‹</button><button class="lbnav r" data-act="lbnav" data-d="1" aria-label="Suivante">›</button>`:''}`;
+ EXT.lightbox.forEach(h=>h.after&&h.after(m));
  const im=$('#lbimg'),st=$('#lbst'),pts=new Map();let last=0;
  im.onload=lbFit;if(im.complete)lbFit();
  const dist=()=>{const v=[...pts.values()];return v.length>1?Math.hypot(v[0][0]-v[1][0],v[0][1]-v[1][1]):0};
@@ -214,8 +215,8 @@ async function drawGallery(it,o,cv){
  const cy=H*(story?.29:sq?.27:.33),ch=H*(story?.27:sq?.30:.30);
  const g=x.createRadialGradient(W/2,cy-ch*.15,0,W/2,cy-ch*.15,W*.78);g.addColorStop(0,'rgba(255,236,190,.34)');g.addColorStop(.55,'rgba(255,236,190,.07)');g.addColorStop(1,'rgba(255,236,190,0)');x.fillStyle=g;x.fillRect(0,0,W,H);
  facesRow(x,await shareEls(it),W/2,cy,W-220,ch,60,50,gold);
- const fl=cy+ch/2+(sq?34:44);x.fillStyle='rgba(216,180,106,.5)';x.fillRect(W/2-170,fl,340,3);
- x.textAlign='center';x.textBaseline='alphabetic';let y=fl+(sq?90:110);
+ const fl=cy+ch/2+14;x.fillStyle='rgba(216,180,106,.5)';x.fillRect(W/2-170,fl,340,3);
+ x.textAlign='center';x.textBaseline='alphabetic';let y=fl+(sq?84:104);
  x.fillStyle=cream;x.font=`600 ${sq?54:64}px ${SERIF}`;const lh=sq?62:74;y+=centered(x,it.denomination||'',W/2,y,W-200,lh,2)*lh-14;
  x.fillStyle=gold;x.font=`500 24px ${SANS}`;spacing(x,6);x.fillText(one(x,subLine(it).toUpperCase(),W-160),W/2,y);spacing(x,0);y+=sq?62:70;
  factGrid(x,shareFacts(it,o),W/2,y,H-118,W-240,{lab:gold,val:cream,labFont:`600 20px ${SANS}`,valFont:`500 30px ${SERIF}`,rowH:sq?84:92});

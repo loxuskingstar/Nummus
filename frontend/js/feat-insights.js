@@ -6,8 +6,8 @@
    d'erreur de frappe. Chaque piste peut être écartée ; ce choix est conservé.
    Diversité : indicateurs descriptifs (effectifs, répartitions, évolution). Aucune note de qualité.
    ===================================================================== */
-addModule('insights','Pistes et diversité','compare','Comparer deux exemplaires, repérer des écarts à vérifier, mesurer la diversité de la collection.',{after:'stats'});
-const INS_TABS=[['diversity','Diversité'],['leads','Pistes à examiner'],['compare','Comparer deux exemplaires'],['goals','Objectifs de diversité']];
+addModule('insights','Pistes et diversité','compare','Comparer 2 à 4 exemplaires (zoom synchronisé), repérer des écarts à vérifier, mesurer la diversité de la collection.',{after:'stats'});
+const INS_TABS=[['diversity','Diversité'],['leads','Pistes à examiner'],['compare','Comparer 2 à 4 exemplaires'],['goals','Objectifs de diversité']];
 const insTab=()=>ui.insTab||'diversity';
 EXT.views.insights=function viewInsights(){
  const t=insTab();
@@ -106,33 +106,47 @@ function viewLeads(){
 Object.assign(ACT,{
  leadDismiss:t=>{state.dismissed[t.dataset.id]=1;savePrefs();render()},
  leadReset:()=>{state.dismissed={};savePrefs();render()},
- insCmp:t=>{CMP.a=t.dataset.a;CMP.b=t.dataset.b;ui.insTab='compare';if(view!=='insights')go('insights');else render()},
+ insCmp:t=>{CMP.a=t.dataset.a;CMP.b=t.dataset.b;CMP.c=CMP.d='';ui.insTab='compare';if(view!=='insights')go('insights');else render()},
 });
 Object.assign(CH,{anW:t=>{state.settings.anomaly.weight=Math.max(.5,+t.value||3);savePrefs();render()},anD:t=>{state.settings.anomaly.diameter=Math.max(.5,+t.value||2);savePrefs();render()}});
 
 /* ================= comparaison visuelle ================= */
-const CMP={a:'',b:'',mode:'side',op:50};
+const CMP={a:'',b:'',c:'',d:'',mode:'side',op:50,face:'front',z:1,x:0,y:0,sync:true};
 const CMP_F=['year','mint','metal','fineness','weight','diameter','edge','axis','grade','variety','rarity','obverse','reverse'];
+const cmpIds=()=>[CMP.a,CMP.b,CMP.c,CMP.d].filter(Boolean);
 function viewCompare(){
  const own=state.items.filter(i=>i.status!=='wish').sort((a,b)=>String(a.denomination).localeCompare(String(b.denomination),'fr',{numeric:true}));
- const sel=(id,cur)=>`<select data-ch="${id}" aria-label="Exemplaire"><option value="">— choisir —</option>${own.map(i=>`<option value="${i.id}" ${i.id===cur?'selected':''}>${esc(i.denomination)} ${esc(fmtYear(i.year))}${i.mint?' ('+esc(i.mint)+')':''}</option>`).join('')}</select>`;
- return `<div class="toolbar">${sel('cmpA',CMP.a)}${sel('cmpB',CMP.b)}<div class="seg"><button data-act="cmpMode" data-v="side" class="${CMP.mode==='side'?'on':''}">Côte à côte</button><button data-act="cmpMode" data-v="overlay" class="${CMP.mode==='overlay'?'on':''}">Superposition</button></div></div><div id="cmpbox"></div>`;
+ const sel=(id,cur,lab)=>`<select data-ch="${id}" aria-label="${lab}"><option value="">${lab}</option>${own.map(i=>`<option value="${i.id}" ${i.id===cur?'selected':''}>${esc(i.denomination)} ${esc(fmtYear(i.year))}${i.mint?' ('+esc(i.mint)+')':''}</option>`).join('')}</select>`;
+ const two=CMP.mode==='overlay';
+ return `<div class="toolbar">${sel('cmpA',CMP.a,'Pièce A')}${sel('cmpB',CMP.b,'Pièce B')}${two?'':sel('cmpC',CMP.c,'Pièce C (facultatif)')+sel('cmpD',CMP.d,'Pièce D (facultatif)')}</div>
+ <div class="actions" style="margin:8px 0"><div class="seg"><button data-act="cmpMode" data-v="side" class="${CMP.mode==='side'?'on':''}">Côte à côte (2 à 4)</button><button data-act="cmpMode" data-v="overlay" class="${CMP.mode==='overlay'?'on':''}">Superposition (2)</button></div>
+ ${two?'':`<div class="seg"><button data-act="cmpFace" data-v="front" class="${CMP.face==='front'?'on':''}">Avers</button><button data-act="cmpFace" data-v="back" class="${CMP.face==='back'?'on':''}">Revers</button></div>
+ <label class="small">Zoom <input type="range" min="1" max="8" step=".1" value="${CMP.z}" data-in="cmpZ" style="width:140px;vertical-align:middle"></label><button class="btn sm" data-act="cmpReset">Recentrer</button>`}</div><div id="cmpbox"></div>`;
 }
-Object.assign(CH,{cmpA:t=>{CMP.a=t.value;drawCompare()},cmpB:t=>{CMP.b=t.value;drawCompare()}});
-ACT.cmpMode=t=>{CMP.mode=t.dataset.v;render()};
+Object.assign(CH,{cmpA:t=>{CMP.a=t.value;drawCompare()},cmpB:t=>{CMP.b=t.value;drawCompare()},cmpC:t=>{CMP.c=t.value;drawCompare()},cmpD:t=>{CMP.d=t.value;drawCompare()}});
+Object.assign(ACT,{cmpMode:t=>{CMP.mode=t.dataset.v;render()},cmpFace:t=>{CMP.face=t.dataset.v;render()},cmpReset:()=>{CMP.z=1;CMP.x=CMP.y=0;render()}});
 async function cmpImgs(it){
  const out={front:'',back:''};if(!it)return out;
  for(const m of it.imgs||[]){if(m.role!=='front'&&m.role!=='back')continue;if(out[m.role])continue;try{const b=await Store.images.get(state.userId,m.id);if(b)out[m.role]=await blobToData(b)}catch(e){}}
  if(!out.front&&it.cover)out.front=it.cover;return out;
 }
+const cmpTf=()=>`translate(${CMP.x}px,${CMP.y}px) scale(${CMP.z})`;
 async function drawCompare(){
- const box=$('#cmpbox');if(!box)return;const a=state.items.find(i=>i.id===CMP.a),b=state.items.find(i=>i.id===CMP.b);
- if(!a||!b){box.innerHTML='<div class="empty glass"><b>Choisissez deux exemplaires</b><p>Idéalement du même type (même dénomination et millésime) pour repérer des différences visuelles.</p></div>';return}
- const [ia,ib]=await Promise.all([cmpImgs(a),cmpImgs(b)]);if(!$('#cmpbox'))return;
+ const box=$('#cmpbox');if(!box)return;const its=cmpIds().map(id=>state.items.find(i=>i.id===id)).filter(Boolean);
+ if(its.length<2){box.innerHTML='<div class="empty glass"><b>Choisissez au moins deux exemplaires</b><p>Idéalement du même type (même dénomination et millésime) pour repérer des différences de coin, de millésime ou d’atelier. Jusqu’à quatre en côte à côte, avec zoom synchronisé.</p></div>';return}
+ const ims=await Promise.all(its.map(cmpImgs));if(!$('#cmpbox'))return;
  const img=(s,al)=>s?`<img src="${esc(s)}" alt="${esc(al)}">`:`<div class="ph" style="height:160px;display:grid;place-items:center">${ic('coin',40)}</div>`;
- const rows=CMP_F.map(k=>{const f=BUILTIN.find(x=>x.key===k),va=a[k],vb=b[k];if(isEmpty(va)&&isEmpty(vb))return'';const diff=String(va??'')!==String(vb??'');return `<tr><th>${esc(f?f.label:k)}</th><td class="${diff?'d':''}">${esc(String(va??'—'))}</td><td class="${diff?'d':''}">${esc(String(vb??'—'))}</td></tr>`}).join('');
+ const rows=CMP_F.map(k=>{const f=BUILTIN.find(x=>x.key===k),vs=its.map(i=>i[k]);if(vs.every(isEmpty))return'';const diff=new Set(vs.map(v=>String(v??''))).size>1;return `<tr><th>${esc(f?f.label:k)}</th>${vs.map(v=>`<td class="${diff?'d':''}">${esc(String(v??'—'))}</td>`).join('')}</tr>`}).join('');
+ const [a,b]=its,[ia,ib]=ims;
  const vis=CMP.mode==='overlay'?`<div class="cmp" style="grid-template-columns:1fr"><div class="side glass"><div class="ovl">${img(ia.front,a.denomination)}<div style="position:absolute;inset:0;opacity:${CMP.op/100}">${ib.front?`<img src="${esc(ib.front)}" alt="${esc(b.denomination)}" style="width:100%;height:100%;object-fit:contain">`:''}</div></div><input type="range" min="0" max="100" value="${CMP.op}" data-in="cmpOp" aria-label="Opacité du second exemplaire" style="width:min(100%,320px)"><p class="muted small">Faites glisser pour fondre le second exemplaire sur le premier. Les images doivent être cadrées de façon comparable.</p></div></div>`
-  :`<div class="cmp">${[[a,ia],[b,ib]].map(([it,im])=>`<div class="side glass"><b>${esc(it.denomination)}</b> <span class="muted small">${esc(subtitle(it))}</span><div style="margin-top:8px">${img(im.front,it.denomination)}</div>${im.back?`<div style="margin-top:8px">${img(im.back,it.denomination+' (revers)')}</div>`:''}</div>`).join('')}</div>`;
- box.innerHTML=`${vis}<table class="glass panel" style="margin-top:14px;display:table"><thead><tr><th></th><th>Exemplaire A</th><th>Exemplaire B</th></tr></thead><tbody>${rows||'<tr><td colspan="3" class="muted">Aucune donnée à comparer.</td></tr>'}</tbody></table><p class="muted small" style="margin-top:8px">Les cases surlignées signalent une différence de saisie, pas une conclusion.</p>`;
+  :`<div class="cmp" style="grid-template-columns:repeat(${its.length},1fr)">${its.map((it,k)=>{const s=ims[k][CMP.face]||(CMP.face==='back'?'':ims[k].front);return `<div class="side glass"><b>${esc(it.denomination)}</b> <span class="muted small">${esc(subtitle(it))}</span><div class="cmpvp" data-vp>${s?`<img src="${esc(s)}" alt="${esc(it.denomination)}" draggable="false" style="transform:${cmpTf()}">`:`<div class="ph" style="height:100%;display:grid;place-items:center">${ic('coin',40)}</div>`}</div></div>`}).join('')}</div><p class="muted small" style="margin-top:6px">Molette ou curseur pour zoomer, glisser pour déplacer : toutes les vues bougent ensemble.</p>`;
+ box.innerHTML=`${vis}<div style="overflow-x:auto"><table class="glass panel" style="margin-top:14px;display:table"><thead><tr><th></th>${its.map((_,k)=>`<th>Exemplaire ${'ABCD'[k]}</th>`).join('')}</tr></thead><tbody>${rows||`<tr><td colspan="${its.length+1}" class="muted">Aucune donnée à comparer.</td></tr>`}</tbody></table></div><p class="muted small" style="margin-top:8px">Les cases surlignées signalent une différence de saisie, pas une conclusion.</p>`;
 }
-document.addEventListener('input',e=>{const t=e.target;if(t.dataset&&t.dataset.in==='cmpOp'){CMP.op=+t.value;const w=$('.ovl>div');if(w)w.style.opacity=CMP.op/100}});
+/* zoom et déplacement synchronisés */
+const cmpPaint=()=>$$('#cmpbox [data-vp] img').forEach(i=>i.style.transform=cmpTf());
+document.addEventListener('wheel',e=>{const v=e.target.closest&&e.target.closest('[data-vp]');if(!v)return;e.preventDefault();CMP.z=Math.min(8,Math.max(1,CMP.z*Math.exp(-e.deltaY*.0015)));if(CMP.z===1)CMP.x=CMP.y=0;const r=$('[data-in=cmpZ]');if(r)r.value=CMP.z;cmpPaint()},{passive:false});
+let cmpDrag=null;
+document.addEventListener('pointerdown',e=>{const v=e.target.closest&&e.target.closest('[data-vp]');if(!v)return;cmpDrag=[e.clientX,e.clientY,CMP.x,CMP.y];v.setPointerCapture(e.pointerId)});
+document.addEventListener('pointermove',e=>{if(!cmpDrag||CMP.z<=1)return;CMP.x=cmpDrag[2]+(e.clientX-cmpDrag[0]);CMP.y=cmpDrag[3]+(e.clientY-cmpDrag[1]);cmpPaint()});
+document.addEventListener('pointerup',()=>{cmpDrag=null});
+document.addEventListener('input',e=>{const t=e.target;if(t.dataset&&t.dataset.in==='cmpZ'){CMP.z=+t.value;if(CMP.z===1)CMP.x=CMP.y=0;cmpPaint()}else if(t.dataset&&t.dataset.in==='cmpOp'){CMP.op=+t.value;const w=$('.ovl>div');if(w)w.style.opacity=CMP.op/100}});

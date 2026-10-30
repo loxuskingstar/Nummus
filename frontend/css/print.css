@@ -18,3 +18,22 @@
  #print .p-foot{margin-top:14pt;color:#555;font-size:8.5pt}
  #print .p-note{color:#333;font-size:9pt;margin-top:3pt}
 }
+
+/* ---------- dossier assurance et livre (feat-book.js) ---------- */
+@media print{
+ #print .ds-sum{margin:10pt 0 14pt}#print .ds-sum th{width:22%;border:0;font-size:9pt}#print .ds-sum td{border:0;font-weight:700}
+ #print .ds-item{break-inside:avoid;page-break-inside:avoid;border:.6pt solid #999;border-radius:3pt;margin-bottom:9pt;padding:6pt}
+ #print .ds-head{display:flex;justify-content:space-between;gap:10pt;border-bottom:.5pt solid #bbb;padding-bottom:3pt;margin-bottom:5pt}
+ #print .ds-body{display:flex;gap:10pt}#print .ds-ph{display:flex;gap:4pt;flex:0 0 auto}#print .ds-ph img{height:34mm;width:auto;max-width:36mm;object-fit:contain}
+ #print .ds-t{margin:4pt 0}#print .ds-t th{width:34mm;border:0;padding:1pt 4pt;font-size:8.5pt}#print .ds-t td{border:0;padding:1pt 4pt}
+ #print .ds-sign{display:flex;justify-content:space-between;margin-top:26pt;break-inside:avoid}#print .ds-sign .line{display:inline-block;width:60mm;border-bottom:.6pt solid #000}
+ #print .bk-cover{height:250mm;display:grid;place-items:center;text-align:center;break-after:page}#print .bk-cover h1{font-size:30pt;margin:18pt 0 6pt}#print .bk-owner{font-size:14pt}
+ #print .bk-cimg img{max-height:110mm;max-width:130mm;object-fit:contain}
+ #print .bk-sec{break-before:page}#print .bk-sec h2{font-family:var(--serif);font-size:20pt;border-bottom:1.5pt solid #000;padding-bottom:3pt;margin-bottom:10pt}
+ #print .bk-toc{list-style:none;padding:0}#print .bk-toc li{display:flex;align-items:baseline;gap:6pt;padding:3pt 0;font-size:11pt}#print .bk-toc a{color:#000;text-decoration:none;font-weight:700}#print .bk-dots{flex:1;border-bottom:.5pt dotted #777}
+ #print .bk-card{display:flex;gap:12pt;break-inside:avoid;margin-bottom:14pt;padding-bottom:10pt;border-bottom:.5pt solid #ccc}
+ #print .bk-ph{flex:0 0 78mm;display:flex;flex-direction:column;gap:4pt}#print .bk-ph img{width:100%;max-height:72mm;object-fit:contain}
+ #print .bk-tx h3{margin:0 0 2pt;font-size:13pt}#print .bk-sub{color:#555;margin:0 0 5pt}#print .bk-tx p{margin:0 0 4pt;font-size:10pt}
+ #print .bk-idx{columns:2;column-gap:14mm;padding:0;list-style:none;font-size:9.5pt}#print .bk-idx li{break-inside:avoid;padding:1pt 0}
+ #print .bk-gl dt{font-weight:700;margin-top:6pt}#print .bk-gl dd{margin:0 0 2pt;font-size:10pt}
+}

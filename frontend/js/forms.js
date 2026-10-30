@@ -99,6 +99,7 @@ async function saveItem(){
  it.imgs.forEach(m=>{delete m._c;DRAFT.delete(m.id)});
  delete it._origImgs;delete it._origPrimary;delete it._prevValue;it.updated=Date.now();
  const fresh=!state.items.some(x=>x.id===it.id);
+ EXT.beforeSave.forEach(fn=>{try{fn(it,fresh)}catch(e){console.error(e)}});
  putItems([it]);closeModal();render();toast('Enregistré');
  if(fresh&&it.status!=='wish'&&typeof offerWishMatch==='function')setTimeout(()=>offerWishMatch(it),250);
 }

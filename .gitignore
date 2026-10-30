@@ -5,5 +5,5 @@ data/backups/*
 !data/*/.gitkeep
 __pycache__/
 *.pyc
-*.tgz
-*.sqlite3*
+node_modules
+eslint.globals.json

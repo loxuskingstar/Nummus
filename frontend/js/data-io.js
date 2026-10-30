@@ -52,7 +52,7 @@ function dupBlock(dups,id){
  if(!dups.length)return'';
  return `<fieldset><legend>${ic('shield',14)} ${pl(dups.length,'doublon potentiel','doublons potentiels')}</legend><p class="muted small">Même pays, dénomination, année et référence qu’une entrée déjà présente :</p><ul class="small">${dups.slice(0,6).map(([a])=>`<li>${esc(a.denomination)} <span class="muted">${esc([cname(a.country),fmtYear(a.year)].filter(Boolean).join(', '))}</span></li>`).join('')}${dups.length>6?`<li class="muted">… et ${dups.length-6} autres</li>`:''}</ul><label class="chk"><input type="checkbox" id="${id}" checked> Ignorer ces doublons</label></fieldset>`;
 }
-function commitCSV(list){putItems(list);closeModal();render();toast(pl(list.length,'entrée importée','entrées importées'))}
+function commitCSV(list){list.forEach(it=>EXT.beforeSave.forEach(fn=>{try{fn(it,true)}catch(e){console.error(e)}}));putItems(list);closeModal();render();toast(pl(list.length,'entrée importée','entrées importées'))}
 async function exportJSON(){
  let data;try{data=await DataIO.export(state.userId)}catch(e){data={format:'nummus',schema:2,exportedAt:new Date().toISOString(),user:{id:state.userId,name:userName()},items:state.items,prefs:prefsOf()}}
  download(`nummus-${slug(userName())}-${today()}.json`,JSON.stringify(data,null,1),'application/json');
@@ -86,7 +86,7 @@ const davURL=()=>{const w=state.settings.webdav;let u=(w.url||'').trim();if(!u)r
 const davHdr=()=>{const w=state.settings.webdav,h={};if(w.user)h.Authorization='Basic '+btoa(unescape(encodeURIComponent(w.user+':'+(w.pass||''))));return h};
 async function davPush(){
  const u=davURL();if(!u){toast('Renseignez l’adresse WebDAV');return}
- try{const data=await DataIO.export(state.userId);const r=await fetch(u,{method:'PUT',headers:{...davHdr(),'Content-Type':'application/json'},body:JSON.stringify(data)});
+ try{const data=await DataIO.export(state.userId);const r=await fetch(u,{method:'PUT',headers:{...davHdr(),'Content-Type':'application/json'},body:await sealForUpload(data)});
   if(!r.ok)throw new Error('HTTP '+r.status);state.settings.webdav.last=Date.now();savePrefs();toast('Sauvegarde envoyée sur le serveur WebDAV');if(view==='settings')render()}
  catch(e){toast('Envoi WebDAV impossible ('+(e.message||'réseau / CORS')+')')}
 }
@@ -106,6 +106,8 @@ function checkBackup(){
 }
 
 /* ---------- impression / PDF ---------- */
+/* mises en page d'impression : feat-book.js en ajoute (dossier, livre) */
+const PRINTERS={},PRINT_PREP={},PRINT_LAYOUTS=[['table','Inventaire en tableau']];
 function openPrint(){
  const canF=isListView()&&ui.lastResults.length>0,canS=ui.picked.size>0,v=vit(),hv=hideVals();
  const nAll=pool().filter(i=>i.status!=='wish').length;
@@ -116,6 +118,7 @@ function openPrint(){
   <label class="chk"><input type="radio" name="psrc" value="all" ${src==='all'?'checked':''}> Toute la collection (${nAll})</label>
   ${canF?`<label class="chk"><input type="radio" name="psrc" value="filtered" ${src==='filtered'?'checked':''}> Résultats affichés (${ui.lastResults.length})</label>`:''}
   ${canS?`<label class="chk"><input type="radio" name="psrc" value="selection" ${src==='selection'?'checked':''}> Sélection (${ui.picked.size})</label>`:''}</div></fieldset>
+ <fieldset><legend>Mise en page</legend><select id="p_l" data-ch="printLayout">${PRINT_LAYOUTS.map(l=>`<option value="${l[0]}">${l[1]}</option>`).join('')}</select><p class="muted small" id="p_ld" style="margin-top:6px"></p></fieldset>
  <fieldset><legend>Informations</legend><div class="fgrid">${ck('p_ph','Photos',true)}${ck('p_de','Descriptions avers / revers',false)}${ck('p_va','Valeurs estimées',true,hv)}${ck('p_pa','Prix payés et dates d’achat',!v,v)}${ck('p_st','Emplacements',false,v)}${ck('p_no','Notes personnelles',false,v)}</div>
  <div class="fgrid" style="margin-top:12px"><div class="fld"><label>Titre</label><input id="p_t" value="Inventaire de collection numismatique"></div><div class="fld"><label>Propriétaire</label><input id="p_o" value="${esc(state.settings.owner)}" placeholder="Nom (facultatif)"></div></div></fieldset>
  <div class="actions end"><button class="btn" data-act="close">Annuler</button><button class="btn primary" data-act="doPrint">${ic('print',16)} Générer</button></div>`,true);

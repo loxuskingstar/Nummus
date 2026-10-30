@@ -132,7 +132,7 @@ function MemoryAdapter(){
 let Store=null,persistent=true;
 
 /* ---------- images : Blob Store séparé (les fiches ne contiennent qu'une miniature « cover ») ---------- */
-const IMGURL=new Map(),DRAFT=new Map(),COVER_MAX=360;
+const IMGURL=new Map(),DRAFT=new Map(),COVER_MAX=240;
 const blobToData=b=>new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=rej;r.readAsDataURL(b)});
 const dataToBlob=async d=>(await fetch(d)).blob();
 const imgSync=id=>IMGURL.get(id)||'';
@@ -149,6 +149,7 @@ function coverEnc(c){const w=c.toDataURL('image/webp',.8);return w.startsWith('d
 async function normalizeItemImages(user,it){
  let ch=false;it.imgs=Array.isArray(it.imgs)?it.imgs:[];
  for(const m of it.imgs){if(m.data){const b=await dataToBlob(m.data);await Store.images.put(user,m.id,b);if(!it.cover&&m===it.imgs[0])it.cover=await coverOf(b).catch(()=>'');delete m.data;ch=true}}
+ for(const d of Array.isArray(it.docs)?it.docs:[])if(d.data){await Store.images.put(user,d.id,await dataToBlob(d.data));delete d.data;ch=true}
  for(const[k,role]of[['front','front'],['back','back']]){
   if(!it[k])continue;const id='im_'+uid(),b=await dataToBlob(it[k]);
   await Store.images.put(user,id,b);it.imgs.push({id,role});
@@ -166,8 +167,8 @@ const DataIO={
   const prefs=uid===state.userId?prefsOf():await Store.meta.get(uid,'prefs');
   const u=(session.users||[]).find(x=>x.id===uid)||{id:uid};
   const out=[];
-  for(const it of items){const o=stripUser(it);o.imgs=[];for(const m of it.imgs||[]){let data;try{const b=await Store.images.get(uid,m.id);data=b&&await blobToData(b)}catch(e){}o.imgs.push(data?{...m,data}:{...m})}out.push(o)}
-  const pf=prefs?JSON.parse(JSON.stringify(prefs)):{};if(pf.settings&&pf.settings.webdav)pf.settings.webdav.pass='';
+  for(const it of items){if(it.deleted)continue;const o=stripUser(it);o.imgs=[];for(const m of it.imgs||[]){let data;try{const b=await Store.images.get(uid,m.id);data=b&&await blobToData(b)}catch(e){}o.imgs.push(data?{...m,data}:{...m})}o.docs=[];for(const m of it.docs||[]){let data;try{const b=await Store.images.get(uid,m.id);data=b&&await blobToData(b)}catch(e){}o.docs.push(data?{...m,data}:{...m})}out.push(o)}
+  const pf=stripSecrets(prefs);
   const events=await Store.events.list(uid).catch(()=>[]);
   return{format:'nummus',schema:4,exportedAt:new Date().toISOString(),user:{id:u.id,name:u.name},items:out,prefs:pf,events};
  },
@@ -178,7 +179,7 @@ const DataIO={
  },
  async import(uid,json,mode,opts={}){
   const d=DataIO.parse(json);
-  if(mode==='replace'){await Store.items.clear(uid);await Store.images.clear(uid);await Store.events.clear(uid);await Store.meta.put(uid,'prefs',normalizePrefs(d.prefs));if(d.events.length)await Store.events.bulkAdd(uid,d.events)}
+  if(mode==='replace'){await Store.items.clear(uid);await Store.images.clear(uid);await Store.events.clear(uid);const np=normalizePrefs(d.prefs);if(uid===state.userId){np.settings.webdav.pass=np.settings.webdav.pass||state.settings.webdav.pass;np.settings.numista.key=np.settings.numista.key||state.settings.numista.key}await Store.meta.put(uid,'prefs',np);if(d.events.length)await Store.events.bulkAdd(uid,d.events)}
   else{
    const cur=normalizePrefs(uid===state.userId?prefsOf():await Store.meta.get(uid,'prefs')),inc=normalizePrefs(d.prefs);
    inc.customFields.forEach(f=>{if(!cur.customFields.some(x=>x.key===f.key))cur.customFields.push(f)});

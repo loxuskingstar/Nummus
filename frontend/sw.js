@@ -2,7 +2,7 @@
    - code de l'application : réseau d'abord (toujours la dernière version), cache en secours ;
    - bibliothèques (vendor/), icônes : cache d'abord ;
    - API (/api/) : jamais mise en cache — les données restent côté serveur. */
-const V='nummus-v4';
+const V='nummus-v5';
 self.addEventListener('install',e=>{e.waitUntil(self.skipWaiting())});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(k=>Promise.all(k.filter(x=>x!==V).map(x=>caches.delete(x)))).then(()=>self.clients.claim()))});
 const put=(r,x)=>{if(x&&x.ok){const c=x.clone();caches.open(V).then(h=>h.put(r,c))}return x};

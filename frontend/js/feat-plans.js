@@ -7,7 +7,9 @@
    la quantité d'une fiche est un nombre d'exemplaires identiques, non des exemplaires nommés un à un.
    Les déplacements sont journalisés ; les propositions d'organisation ne s'appliquent qu'après validation.
    ===================================================================== */
-addModule('plans','Plans de rangement','slots','Classeurs, plateaux et boîtes avec emplacements numérotés, déplacements et plan imprimable.',{after:'storage',view:()=>viewPlans()});
+EXT.views.plans=()=>viewPlans();EXT.views.storage=()=>viewRangement();   // un seul écran « Rangement » (plans et arborescence)
+MODULE_INFO.storage=['Rangement','Plans à emplacements numérotés (classeurs, plateaux, médailliers) et arborescence des emplacements, réunis dans un même écran.'];
+const CLOOKS={grid:'Grille simple',album:'Album relié (pochettes)',medal:'Médaillier (tiroir en bois)'};
 const CKINDS={classeur:'Classeur',plateau:'Plateau',boite:'Boîte',tiroir:'Tiroir',capsules:'Capsules',autre:'Autre'};
 const ctrOf=id=>state.containers.find(c=>c.id===id);
 const ctrSize=c=>Math.max(1,(c.pages||1)*(c.cols||1)*(c.rows||1));
@@ -22,16 +24,27 @@ const itemById=id=>state.items.find(i=>i.id===id);
 
 function viewPlans(){
  if(view.startsWith('plans:')){const c=ctrOf(view.slice(6));if(c)return viewContainer(c)}
+ ui.stTab='plans';return viewRangement();
+}
+/* écran unique « Rangement » : plans à alvéoles d'un côté, arborescence texte de l'autre */
+function viewRangement(){
+ const tab=ui.stTab||'plans';
+ return `<header class="head"><div><h1>Rangement</h1><p class="sub">Où est quoi : représentez vos classeurs, plateaux et médailliers emplacement par emplacement, ou décrivez simplement un chemin de texte. Ranger une pièce dans un plan renseigne aussi son champ Emplacement.</p></div></header>
+ <div class="seg" style="margin-bottom:14px"><button class="${tab==='plans'?'on':''}" data-act="stTab" data-t="plans">${ic('slots',15)} Plans à emplacements</button><button class="${tab==='tree'?'on':''}" data-act="stTab" data-t="tree">${ic('folder',15)} Arborescence</button></div>
+ ${tab==='plans'?plansBody():viewStorage(true)}`;
+}
+function plansBody(){
  const cs=state.containers,pm=placedMap();
  const owned=state.items.filter(i=>i.status!=='wish'),copies=owned.reduce((n,i)=>n+qtyOf(i),0),placed=[...pm.values()].reduce((n,a)=>n+a.length,0);
- return `<header class="head"><div><h1>Plans de rangement</h1><p class="sub">Représentez vos classeurs, plateaux et boîtes. ${placed} exemplaire${placed>1?'s':''} rangé${placed>1?'s':''} sur ${copies} (${copies-placed>0?copies-placed+' sans emplacement':'tout est rangé'}).</p></div><div class="actions"><button class="btn primary" data-act="ctrNew">${ic('plus')} Nouveau contenant</button></div></header>
+ return `<p class="muted" style="margin-bottom:12px">${placed} exemplaire${placed>1?'s':''} rangé${placed>1?'s':''} sur ${copies} (${copies-placed>0?copies-placed+' sans emplacement':'tout est rangé'}).</p>
+ <div class="actions" style="margin-bottom:14px"><button class="btn primary" data-act="ctrNew">${ic('plus')} Nouveau contenant</button><button class="btn" data-act="ctrFromSeries">${ic('album',16)} Album d’une série…</button>${cs.length?`<button class="btn" data-act="ctrSyncAll" title="Écrit « Classeur > Page > n° » dans le champ Emplacement des fiches rangées">${ic('refresh',16)} Synchroniser les emplacements</button>`:''}</div>
  ${cs.length?`<label class="search" style="margin-bottom:16px">${ic('search')}<input id="plq" placeholder="Où est… ? (nom d’une pièce) — ou numéro d’emplacement, ex. « 14 »" autocomplete="off"></label><div id="plres"></div>
  <div class="modgrid">${cs.map(c=>{const n=ctrSize(c),f=ctrFree(c);return `<button class="mcard glass" data-act="nav" data-v="plans:${c.id}"><h3>${ic('slots',18)} ${esc(c.name)}</h3><span class="meta">${CKINDS[c.kind]||'Contenant'} · ${n} emplacements${c.pages>1?` (${c.pages} pages)`:''}</span><div class="pbar"><i style="width:${(n-f)/n*100}%"></i></div><span class="meta">${n-f} occupés · ${f} libres</span></button>`}).join('')}</div>
  <div class="actions" style="margin-top:18px"><button class="btn" data-act="planPropose">${ic('refresh',16)} Proposer une organisation…</button></div>`
  :`<div class="empty glass"><b>Aucun contenant</b><p>Créez par exemple « Classeur bleu » (8 pages de 20 emplacements) ou « Plateau euros ».</p><button class="btn primary" data-act="ctrNew">${ic('plus')} Créer un contenant</button></div>`}`;
 }
 function afterPlans(){const q=$('#plq');if(q)q.addEventListener('input',()=>planSearch(q.value))}
-EXT.after.plans=afterPlans;
+EXT.after.plans=afterPlans;EXT.after.storage=afterPlans;
 function planSearch(q){
  const el=$('#plres');if(!el)return;q=q.trim();if(!q){el.innerHTML='';return}
  const pm=placedMap(),out=[];
@@ -46,13 +59,13 @@ function planSearch(q){
 }
 function viewContainer(c){
  const n=ctrSize(c),per=(c.cols||1)*(c.rows||1),pages=c.pages||1,pm=placedMap(),hl=ui.planHit||'';
- const cell=k=>{const id=(c.occ||{})[k],it=id&&itemById(id);
-  return `<button class="cell ${it?'occ':''} ${hl&&it&&it.id===hl?'hit':''}" data-act="cellOpen" data-c="${c.id}" data-n="${k}" title="${esc(it?it.denomination+' — n° '+k:'Libre — n° '+k)}">${it&&it.cover?`<img src="${esc(it.cover)}" alt="">`:it?ic(it.type==='note'?'note':'coin',14):''}<span class="${it&&it.cover?'n':''}">${it&&it.cover?k:k}</span></button>`};
- const grids=[...Array(pages)].map((_,p)=>`<div class="cpage">${pages>1?`<h4>Page ${p+1}</h4>`:''}<div class="cgrid" style="grid-template-columns:repeat(${c.cols||1},minmax(0,${c.cols>14?32:54}px))">${[...Array(per)].map((_,j)=>cell(p*per+j+1)).join('')}</div></div>`).join('');
+ const cell=k=>{const id=(c.occ||{})[k],it=id&&itemById(id),lab=ctrLabel(c,k);
+  return `<button class="cell ${it?'occ':''} ${lab&&!it?'ghost':''} ${hl&&it&&it.id===hl?'hit':''}" data-act="cellOpen" data-c="${c.id}" data-n="${k}" title="${esc(it?it.denomination+' — n° '+k:(lab?'Manquante : '+lab+' — n° '+k:'Libre — n° '+k))}">${it&&it.cover?`<img src="${esc(it.cover)}" alt="">`:it?ic(it.type==='note'?'note':'coin',14):''}<span class="${it&&it.cover?'n':''}">${k}</span>${lab?`<em class="clab">${esc(lab)}</em>`:''}</button>`};
+ const grids=[...Array(pages)].map((_,p)=>`<div class="cpage">${pages>1?`<h4>Page ${p+1}</h4>`:''}<div class="cgrid" style="grid-template-columns:repeat(${c.cols||1},minmax(0,${c.cols>14?32:(c.look&&c.look!=='grid'?66:54)}px))">${[...Array(per)].map((_,j)=>cell(p*per+j+1)).join('')}</div></div>`).join('');
  const hist=state.events.filter(e=>['place','free','move'].includes(e.kind)&&((e.snap.to&&e.snap.to.c===c.id)||(e.snap.from&&e.snap.from.c===c.id))).slice(-12).reverse();
- return `<header class="head"><div><p class="muted small"><button class="btn sm" data-act="nav" data-v="plans">← Plans</button> ${CKINDS[c.kind]||''}</p><h1>${esc(c.name)}</h1><p class="sub">${n-ctrFree(c)} occupés · ${ctrFree(c)} libres sur ${n}</p></div>
+ return `<header class="head"><div><p class="muted small"><button class="btn sm" data-act="nav" data-v="plans">← Plans</button> ${CKINDS[c.kind]||''}</p><h1>${esc(c.name)}</h1><p class="sub">${n-ctrFree(c)} occupés · ${ctrFree(c)} libres sur ${n}${c.series&&serOf(c.series)?` · cases de la série « ${esc(serOf(c.series).name)} »`:''}</p></div>
  <div class="actions"><button class="btn" data-act="ctrPrint" data-id="${c.id}">${ic('print',16)} Imprimer le plan</button><button class="btn" data-act="ctrEdit" data-id="${c.id}">${ic('edit',16)} Modifier</button><button class="btn danger" data-act="ctrDel" data-id="${c.id}">${ic('trash',16)}</button></div></header>
- <div class="panel glass">${grids}</div>
+ <div class="panel glass cview look-${c.look||'grid'}">${grids}</div>${c.series&&serOf(c.series)&&serOf(c.series).slots.length>n?`<p class="muted small" style="margin-top:8px">${ic('warn',14)} La série « ${esc(serOf(c.series).name)} » compte ${serOf(c.series).slots.length} cases pour ${n} emplacements : agrandissez le contenant pour les voir toutes.</p>`:''}
  <p class="muted small" style="margin-top:8px">Cliquez un emplacement libre pour y ranger une pièce, un emplacement occupé pour la déplacer ou la retirer.</p>
  ${hist.length?`<section class="panel glass" style="margin-top:16px"><h3>Derniers mouvements</h3>${hist.map(e=>`<div class="dl-row"><span class="muted small">${esc(dateFR(e.t))}</span><span>${esc(e.snap.name||'')} — ${e.kind==='free'?`retirée de n° ${e.snap.from.n}`:e.kind==='place'?`rangée en n° ${e.snap.to.n}`:`n° ${e.snap.from.n} → ${e.snap.to.c===c.id?'n° '+e.snap.to.n:esc((ctrOf(e.snap.to.c)||{}).name||'?')+' n° '+e.snap.to.n}`}</span><span></span></div>`).join('')}</section>`:''}`;
 }
@@ -61,14 +74,17 @@ function ctrForm(c){
  const k=c?c.kind:'classeur';
  promptModal(c?'Modifier le contenant':'Nouveau contenant',`<div class="fgrid"><div class="fld wide"><label>Nom</label><input id="ct_n" required value="${esc(c?c.name:'')}" placeholder="Classeur bleu, Plateau euros…"></div>
  <div class="fld"><label>Type</label><select id="ct_k">${opt(Object.entries(CKINDS),k)}</select></div>
+ <div class="fld"><label>Aspect</label><select id="ct_l">${opt(Object.entries(CLOOKS),c&&c.look||'grid')}</select></div>
+ <div class="fld"><label>Cases d’une série (facultatif)</label><select id="ct_s"><option value="">Emplacements libres</option>${opt(state.series.filter(x=>x.mode!=='rule').map(x=>[x.id,x.name]),c&&c.series||'')}</select></div>
  <div class="fld"><label>Pages / plateaux</label><input id="ct_p" type="number" min="1" max="60" value="${c?c.pages||1:1}"></div>
  <div class="fld"><label>Colonnes</label><input id="ct_c" type="number" min="1" max="30" value="${c?c.cols:5}"></div>
  <div class="fld"><label>Lignes par page</label><input id="ct_r" type="number" min="1" max="30" value="${c?c.rows:4}"></div></div>
  <p class="muted small">Total = pages × colonnes × lignes. Réduire la taille d’un contenant libère seulement les emplacements supprimés si ils sont vides.</p>`,'ctrOk','Enregistrer',c?`data-id="${c.id}"`:'');
 }
 SUBMIT.ctrOk=f=>{
- const d={name:$('#ct_n').value.trim(),kind:$('#ct_k').value,pages:Math.max(1,+$('#ct_p').value||1),cols:Math.max(1,+$('#ct_c').value||1),rows:Math.max(1,+$('#ct_r').value||1)};if(!d.name)return;
+ const d={name:$('#ct_n').value.trim(),kind:$('#ct_k').value,look:$('#ct_l').value,series:$('#ct_s').value||undefined,pages:Math.max(1,+$('#ct_p').value||1),cols:Math.max(1,+$('#ct_c').value||1),rows:Math.max(1,+$('#ct_r').value||1)};if(!d.name)return;
  let c=f.dataset.id?ctrOf(f.dataset.id):null;
+ if(d.series){const ns=(serOf(d.series)||{slots:[]}).slots.length;if(ns>d.pages*d.cols*d.rows)d.pages=Math.ceil(ns/(d.cols*d.rows))}   // assez de pages pour toutes les cases de la série
  if(c){const old=c.occ||{},nn=d.pages*d.cols*d.rows,lost=Object.keys(old).filter(k=>+k>nn);if(lost.length){toast('Des emplacements occupés seraient supprimés : libérez-les d’abord');return}Object.assign(c,d)}
  else{c={id:uid(),occ:{},...d};state.containers.push(c)}
  savePrefs();closeModal();go('plans:'+c.id);
@@ -161,3 +177,52 @@ EXT.detail.push(it=>{
  return `<section class="vhist"><h3>Rangement (plans)</h3><p class="small" style="margin-top:6px">${l.length?l.map(x=>`<button class="chip acc" data-act="planGo" data-c="${x.c}" data-n="${x.n}" data-id="${it.id}">${esc(slotRef(ctrOf(x.c),x.n))}</button>`).join(' '):'<span class="muted">Aucun emplacement dans un plan.</span>'}</p></section>`;
 });
 ACT.planGo=t=>{closeModal();ui.planHit=t.dataset.id;go('plans:'+t.dataset.c);setTimeout(()=>{ui.planHit='';const h=$('.cell.hit');if(h)h.scrollIntoView({block:'center',behavior:'smooth'})},50)};
+
+/* ---------- cases issues d'une série : album, médaillier ---------- */
+function ctrLabel(c,k){
+ const sr=c.series&&serOf(c.series),sl=sr&&sr.slots[k-1];if(!sl)return'';
+ return (sl.year!==undefined&&sl.year!==null&&sl.year!==''?fmtYear(sl.year):sl.label||'')+(sl.mint?' '+sl.mint:'');
+}
+Object.assign(ACT,{
+ stTab:t=>{ui.stTab=t.dataset.t;render()},
+ ctrFromSeries:()=>{
+  const l=state.series.filter(x=>x.mode!=='rule');
+  if(!l.length){toast('Créez d’abord une série à cases (menu Séries)');return}
+  promptModal('Album d’une série',`<div class="fgrid"><div class="fld wide"><label>Série</label><select id="cs_s">${opt(l.map(x=>[x.id,`${x.name} (${x.slots.length} cases)`]),l[0].id)}</select></div>
+   <div class="fld"><label>Aspect</label><select id="cs_l">${opt(Object.entries(CLOOKS).filter(x=>x[0]!=='grid'),'album')}</select></div>
+   <div class="fld"><label>Colonnes</label><input id="cs_c" type="number" min="1" max="12" value="5"></div><div class="fld"><label>Lignes par page</label><input id="cs_r" type="number" min="1" max="12" value="4"></div>
+   <label class="chk wide"><input type="checkbox" id="cs_p" checked> Ranger automatiquement les pièces que je possède déjà</label></div>
+   <p class="muted small">Une case est créée pour chaque millésime ou type de la série, y compris ceux qui vous manquent : ils restent en pointillés, avec leur année, jusqu’à ce que vous les trouviez.</p>`,'ctrSerOk','Créer l’album');
+ },
+ ctrSyncAll:()=>{const n=ctrSync();render();toast(n?`${pl(n,'fiche mise à jour','fiches mises à jour')}`:'Les emplacements sont déjà à jour')},
+});
+SUBMIT.ctrSerOk=()=>{
+ const sr=serOf($('#cs_s').value);if(!sr)return;
+ const cols=Math.max(1,+$('#cs_c').value||5),rows=Math.max(1,+$('#cs_r').value||4),per=cols*rows;
+ const c={id:uid(),name:sr.name,kind:'classeur',look:$('#cs_l').value,series:sr.id,cols,rows,pages:Math.max(1,Math.ceil(sr.slots.length/per)),occ:{}};
+ if($('#cs_p').checked){
+  const used=new Set();
+  sr.slots.forEach((sl,i)=>{const it=state.items.find(x=>!used.has(x.id)&&slotMatches(sl,x));if(it){used.add(it.id);c.occ[i+1]=it.id;placeLog('place',it,null,{c:c.id,n:i+1})}});
+ }
+ state.containers.push(c);ctrSync();savePrefs();closeModal();go('plans:'+c.id);
+ toast(`${pl(Object.keys(c.occ).length,'pièce rangée','pièces rangées')} sur ${sr.slots.length} cases`);
+};
+
+/* ---------- le plan renseigne le champ « Emplacement » (une seule vérité pour l'utilisateur) ---------- */
+const ctrPath=(c,n)=>{const per=(c.cols||1)*(c.rows||1),p=Math.ceil(n/per);return[c.name,(c.pages||1)>1?`Page ${p}`:null,`n° ${n}`].filter(Boolean).join(' > ')};
+function ctrSync(){
+ const pm=placedMap(),ch=[];
+ state.items.forEach(it=>{
+  if(it.status==='wish')return;
+  const at=pm.get(it.id)||[];
+  if(at.length){
+   const c=ctrOf(at[0].c),path=ctrPath(c,at[0].n);
+   if((!it.storage||it.storageAuto)&&(it.storage!==path||!it.storageAuto))ch.push({...it,storage:path,storageAuto:true,updated:Date.now()});
+  }else if(it.storageAuto){const o={...it,storage:'',updated:Date.now()};delete o.storageAuto;ch.push(o)}
+ });
+ if(ch.length)putItems(ch);
+ return ch.length;
+}
+['cellFree','cellMove','pickSlot','planApply','ctrDel'].forEach(k=>{const f=ACT[k];if(f)ACT[k]=function(){const r=f.apply(this,arguments);if(ctrSync())render();return r}});
+/* une modification manuelle du texte d'emplacement reprend la main sur la valeur automatique */
+EXT.beforeSave.push(it=>{if(!it.storageAuto)return;const o=state.items.find(x=>x.id===it.id);if(!o||o.storage!==it.storage)delete it.storageAuto});

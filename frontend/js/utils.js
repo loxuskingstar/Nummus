@@ -70,14 +70,34 @@ const ICON={
  dice:'<rect x="3.5" y="3.5" width="17" height="17" rx="3"/><circle cx="8.5" cy="8.5" r="1.1"/><circle cx="15.5" cy="15.5" r="1.1"/><circle cx="12" cy="12" r="1.1"/>',
  compare:'<rect x="3" y="4" width="8" height="16" rx="1.5"/><rect x="13" y="4" width="8" height="16" rx="1.5"/>',
  target:'<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.5"/>',
- up:'<path d="M6 14l6-6 6 6"/>',down:'<path d="M6 10l6 6 6-6"/>'
+ up:'<path d="M6 14l6-6 6 6"/>',down:'<path d="M6 10l6 6 6-6"/>',
+ qr:'<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM20 14v3M14 20h3M20 20h1"/>',
+ trophy:'<path d="M8 4h8v6a4 4 0 0 1-8 0zM8 6H4v1a3 3 0 0 0 4 3M16 6h4v1a3 3 0 0 1-4 3M12 14v4M8 21h8M9 18h6"/>',
+ sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.500 1.500M17.500 17.500L19 19M5 19l1.500-1.500M17.500 6.500L19 5"/>',
+ graph:'<circle cx="6" cy="6" r="2.500"/><circle cx="18" cy="8" r="2.500"/><circle cx="12" cy="18" r="2.500"/><path d="M8 7l8 1M7 8l4 8M17 10l-4 6"/>',
+ file:'<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/>',
+ undo:'<path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/>',
+ drag:'<circle cx="9" cy="6" r="1.200"/><circle cx="15" cy="6" r="1.200"/><circle cx="9" cy="12" r="1.200"/><circle cx="15" cy="12" r="1.200"/><circle cx="9" cy="18" r="1.200"/><circle cx="15" cy="18" r="1.200"/>',
+ bolt:'<path d="M13 2L4 14h7l-1 8 9-12h-7z"/>',
+ tree:'<path d="M12 3v6M12 9H5v5M12 9h7v5M5 14v7M19 14v7M12 9v12"/>',
+ scale:'<path d="M12 3v18M6 21h12M5 7h14M5 7l-3 7a3 3 0 0 0 6 0zM19 7l-3 7a3 3 0 0 0 6 0z"/>',
+ stamp:'<path d="M8 21h8M5 17h14v-3a4 4 0 0 0-4-4h-1V7a2 2 0 1 0-4 0v3H9a4 4 0 0 0-4 4z"/>',
+ pen:'<path d="M12 20h9M16.500 3.500a2.100 2.100 0 0 1 3 3L7 19l-4 1 1-4z"/>',
+ arrow:'<path d="M5 19L19 5M9 5h10v10"/>',
+ circle:'<circle cx="12" cy="12" r="8"/>',
+ lock:'<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
+ bin:'<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/>',
+ zap:'<path d="M3 3l18 18M13 2L6 11M18 13l-7 9"/>',
+ album:'<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M12 4v16M6 9h3M6 13h3M15 9h3M15 13h3"/>'
 };
 const ic=(n,s=18)=>`<svg class="ic" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON[n]||''}</svg>`;
-function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(toast.t);toast.t=setTimeout(()=>t.classList.remove('on'),2600)}
+function toast(m){const t=$('#toast');t.textContent=m;t.classList.remove('act');t.classList.add('on');clearTimeout(toast.t);toast.t=setTimeout(()=>t.classList.remove('on'),2600)}
 function download(name,text,mime){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([text],{type:mime}));a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},800)}
 const toRoman=n=>{let r='';for(const[v,s]of[[1000,'M'],[900,'CM'],[500,'D'],[400,'CD'],[100,'C'],[90,'XC'],[50,'L'],[40,'XL'],[10,'X'],[9,'IX'],[5,'V'],[4,'IV'],[1,'I']])while(n>=v){r+=s;n-=v}return r};
 const fromRoman=s=>{const v={I:1,V:5,X:10,L:50,C:100,D:500,M:1000};s=String(s).toUpperCase().trim();if(!s)return NaN;let t=0;for(let i=0;i<s.length;i++){const a=v[s[i]],b=v[s[i+1]]||0;if(!a)return NaN;t+=a<b?-a:a}return toRoman(t)===s?t:NaN};
 const fmtYear=y=>(isEmpty(y)||isNaN(+y))?'':(+y<0?`${-y} av. J.-C.`:String(y));
+/* datation en fourchette : « 44 av. J.-C. – 31 av. J.-C. » ; vide si la fiche n'a pas d'année */
+const yearSpan=it=>{if(!hasYear(it))return'';const a=fmtYear(it.year);return(!isEmpty(it.yearEnd)&&!isNaN(+it.yearEnd)&&+it.yearEnd!==+it.year)?`${a} – ${fmtYear(it.yearEnd)}`:a};
 const century=y=>{const c=Math.ceil(Math.abs(y)/100)||1;return(c===1?'Ier':toRoman(c)+'e')+' siècle'+(y<0?' av. J.-C.':'')};
 const normPath=s=>String(s||'').split('>').map(x=>x.trim()).filter(Boolean).join(' > ');
 const tagsOf=i=>String(i.tags||'').split(',').map(s=>s.trim()).filter(Boolean);
@@ -104,10 +124,17 @@ const BUILTIN=[
  F('currency','Devise','text'),
  F('year','Année (grégorienne)','number',{core:true,ph:'Négative pour av. J.-C.'}),
  F('ruler','Souverain / autorité','text'),
+ F('dynasty','Dynastie / lignée','text',{list:'dynasties',ph:'Julio-Claudiens, Capétiens, Bourbons…'}),
+ F('yearEnd','Année la plus tardive (datation en fourchette)','number',{ph:'Ex. année -44 puis fin -31'}),
+ F('attribution','Attribution incertaine ou disputée','text',{ph:'Tricastins ou Allobroges ?'}),
  F('series','Série / type','text'),
  F('catalog','Référence de catalogue','text',{group:'Références',ph:'KM# 123, Pick 45, RIC I 207…'}),
  F('numista','N° Numista (N#)','text',{group:'Références'}),
  F('mintage','Tirage','number',{group:'Références'}),
+ F('engraver','Graveur','text',{group:'Références',list:'engravers'}),
+ F('hoard','Trésor / lot d’origine','text',{group:'Références',list:'hoards'}),
+ F('overstruck','Surfrappe sur (type de la pièce d’origine)','text',{group:'Références'}),
+ F('symbols','Symboles, monogrammes, différents','text',{group:'Références',ph:'☧, ⚓, Λ, étoile…'}),
  F('mint','Atelier monétaire','text',CO),
  F('metal','Métal / composition','text',{...CO,list:'metals'}),
  F('fineness','Titre (‰)','number',CO),

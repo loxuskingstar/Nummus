@@ -19,7 +19,7 @@ const ACT={
  edit:t=>openForm(t.dataset.id),
  acquire:t=>openForm(t.dataset.id,{status:'owned',acquired:today(),qty:1}),
  dup:t=>{const o=state.items.find(i=>i.id===t.dataset.id);if(!o)return;const c=clone(o);c.id=uid();c.created=Date.now();putItems([c]);closeModal();render();toast('Entrée dupliquée')},
- del:t=>{const o=state.items.find(i=>i.id===t.dataset.id);if(o&&confirm(`Supprimer « ${o.denomination} » ?`)){removeItems([o.id]);closeModal();render();toast('Supprimée')}},
+ del:t=>{const o=state.items.find(i=>i.id===t.dataset.id);if(o){closeModal();trashWithUndo([o.id],`« ${o.denomination} » déplacée dans la corbeille.`);render()}},
  close:()=>closeModal(),close2:()=>closeModal2(),
  /* images */
  rmphoto:t=>{collectForm();formDraft.imgs.splice(+t.dataset.i,1);renderForm()},
@@ -55,7 +55,7 @@ const ACT={
  bMove:()=>promptModal(`Ranger ${pl(ui.picked.size,'entrée','entrées')}`,`<div class="fld"><label>Nouvel emplacement</label><div class="pair"><input id="bm_p" list="dl_storages" placeholder="Meuble > Tiroir 2 > Classeur bleu > Page 4"><button type="button" class="btn sm" data-act="stPick" data-t="bm_p">${ic('folder',15)} Parcourir</button></div></div>${datalists(['storages'])}<p class="muted small" style="margin-top:8px">Laissez vide pour retirer l’emplacement.</p>`,'bMoveOk','Ranger'),
  bTrade:t=>batchApply(i=>{i.trade=t.dataset.v==='1'},n=>`${pl(n,'entrée mise à jour','entrées mises à jour')}`),
  bTags:()=>promptModal(`Tags de ${pl(ui.picked.size,'entrée','entrées')}`,`<div class="fgrid"><div class="fld"><label>Ajouter (séparés par des virgules)</label><input id="bt_a" list="dl_tags"></div><div class="fld"><label>Retirer</label><input id="bt_r" list="dl_tags"></div></div>${datalists(['tags'])}`,'bTagsOk','Appliquer'),
- bDel:()=>{const n=ui.picked.size;if(n&&confirm(`Supprimer définitivement ${pl(n,'entrée','entrées')} ?`)){removeItems([...ui.picked]);ui.picked.clear();renderResults();toast(pl(n,'entrée supprimée','entrées supprimées'))}},
+ bDel:()=>{const n=ui.picked.size;if(n){trashWithUndo([...ui.picked],pl(n,'entrée déplacée','entrées déplacées')+' dans la corbeille.');ui.picked.clear();renderResults()}},
  /* historique de valeur */
  histAdd:t=>{const it=state.items.find(i=>i.id===t.dataset.id);const d=$('#h_d').value,v=parseFloat($('#h_v').value);if(!it||!d||isNaN(v)){toast('Indiquez une date et une valeur');return}
   const c=clone(it);addHist(c,d,v);const last=c.valueHistory[c.valueHistory.length-1];if(last.date===d)c.value=v;c.updated=Date.now();putItems([c]);openDetail(c.id);if(isListView())renderResults()},
@@ -120,13 +120,15 @@ const ACT={
  doPrint:async()=>{
   const src=($('input[name=psrc]:checked')||{}).value||'all';
   const o={photos:$('#p_ph').checked,desc:$('#p_de').checked,values:$('#p_va').checked,paid:$('#p_pa').checked,storage:$('#p_st').checked,notes:$('#p_no').checked,title:$('#p_t').value.trim()||'Inventaire',owner:$('#p_o').value.trim()};
+  o.layout=($('#p_l')||{}).value||'table';
   if(o.owner!==state.settings.owner&&!vit()){state.settings.owner=o.owner;savePrefs()}
   const allowed=new Set(pool().map(i=>i.id));
   let items=src==='selection'?state.items.filter(i=>ui.picked.has(i.id)):src==='filtered'?ui.lastResults.map(id=>state.items.find(i=>i.id===id)).filter(Boolean):pool().filter(i=>i.status!=='wish').sort(SORT.country);
   items=items.filter(i=>allowed.has(i.id)).map(i=>({...i}));
+  if(PRINT_PREP[o.layout])await PRINT_PREP[o.layout](items,o);
   if(o.photos)for(const i of items){const b=(i.imgs||[]).find(m=>m.role==='back');i._pb=b?await Store.images.get(state.userId,b.id).then(coverOf).catch(()=>''):''}
   if(vit()){o.paid=o.storage=o.notes=false;if(hideVals())o.values=false}
-  const p=$('#print');p.innerHTML=printHTML(items,o);closeModal();
+  const p=$('#print');p.innerHTML=(PRINTERS[o.layout]||printHTML)(items,o);closeModal();
   await Promise.all($$('img',p).map(im=>im.decode?im.decode().catch(()=>{}):null));
   window.print();
  },
@@ -257,6 +259,6 @@ const CH={
 };
 document.addEventListener('change',e=>{const t=e.target,c=t.dataset.ch;if(c&&CH[c])CH[c](t,e)});
 
-function offerImport(x){let j,d;try{j=typeof x==='string'?JSON.parse(x):x;d=DataIO.parse(j)}catch(e){toast('Fichier JSON non reconnu');return}
+function offerImport(x){let j,d;try{j=typeof x==='string'?JSON.parse(x):x;if(j&&j.format==='nummus-enc')return importEncrypted(j);d=DataIO.parse(j)}catch(e){toast('Fichier JSON non reconnu');return}
    pendingImport=j;const dups=findDups(d.items);
    openModal(`<div class="mhead"><h2>Importer ${pl(d.items.length,'entrée','entrées')}</h2><button class="x" data-act="close" aria-label="Fermer">${ic('x',22)}</button></div><p class="muted">Fusionner ajoute ces entrées au profil « ${esc(userName())} » (les identifiants identiques sont mis à jour). Remplacer écrase tout, y compris les réglages.</p>${dupBlock(dups,'imp_skip')}<div class="actions end"><button class="btn" data-act="impmerge">Fusionner</button><button class="btn danger" data-act="impreplace">Remplacer tout</button></div>`)}

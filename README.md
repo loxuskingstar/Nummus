@@ -3,17 +3,33 @@
 Gestionnaire de collection numismatique (pièces et billets) : interface web + API Python, un seul conteneur.
 Tout ce qui est à vous vit dans **un seul dossier, `data/`**, que l'on copie pour changer de serveur.
 
-## Note sur le projet
-
-Ce projet est un **projet personnel**. Il a été créé pour répondre à mes propres besoins et une partie du code a été rédigée à l'aide de l'IA, il **n'est pas destiné à être maintenu activement sur le long terme**.
-
-Cependant, si vous trouvez des bugs ou si vous avez des suggestions d'amélioration, toutes les recommandations et critiques constructives sont les bienvenues ! 
-
-### Comment contribuer ou proposer une amélioration :
-* **Ouvrez une Issue :** Pour signaler un bug ou proposer une idée.
-* **Soyez clair :** Expliquez brièvement le problème rencontré ou la fonctionnalité souhaitée.
-* **Proposez une Pull Request :** Si vous avez directement corrigé le code, n'hésitez pas à soumettre vos modifications.
-
+```
+nummus/
+├── docker-compose.yml     # service unique, dossier ./data monté sur /data
+├── Dockerfile             # python:3.12-slim, utilisateur non privilégié
+├── .env.example           # variables d'environnement
+├── data/                  # ← VOS DONNÉES (ignoré par git)
+│   ├── db/                #   nummus.sqlite3 (base, images incluses)
+│   ├── backups/           #   copies cohérentes de la base (automatiques + manuelles + avant migration)
+│   └── logs/              #   nummus.log (rotation automatique)
+├── backend/               # API REST (FastAPI) + SQLite
+│   ├── app/
+│   │   ├── main.py        #   application, journaux, sert aussi le frontend
+│   │   ├── routes.py      #   contrat REST (profils, fiches, images, préférences, journal d'opérations, sauvegardes, Numista, cours)
+│   │   ├── db.py          #   SQLite (WAL) ; déplace automatiquement une ancienne base /data/nummus.sqlite3 vers db/
+│   │   ├── migrations.py  #   migrations de schéma versionnées (PRAGMA user_version)
+│   │   ├── backup.py      #   sauvegardes (API de sauvegarde SQLite) et rotation
+│   │   ├── cli.py         #   info · migrate · backup · dump · load
+│   │   ├── security.py    #   authentification HTTP Basic facultative
+│   │   └── config.py      #   lecture de l'environnement
+│   └── tests/             #   17 tests (API, migrations, sauvegardes, export/import)
+└── frontend/              # interface statique, sans étape de build
+    ├── index.html, config.js, manifest.webmanifest, sw.js
+    ├── css/               #   base, gallery, layout, print, polish, features
+    ├── js/                #   modules de base + feat-*.js (un fichier par fonctionnalité)
+    ├── vendor/            #   D3, TopoJSON, KaTeX, contours du monde (aucun CDN)
+    └── icons/
+```
 
 ## Démarrage
 
@@ -22,7 +38,7 @@ cp .env.example .env        # puis éditer : NUMMUS_PASSWORD, et NUMMUS_UID/GID 
 docker compose up -d --build
 ```
 
-Par défaut l'application est disponible sur <http://localhost:8080> (port réglable avec `NUMMUS_PORT`).
+L'application est disponible sur <http://localhost:8080> (port réglable avec `NUMMUS_PORT`).
 Le dossier `./data` doit appartenir à l'utilisateur indiqué par `NUMMUS_UID`/`NUMMUS_GID` (sinon : `sudo chown -R 1000:1000 data`).
 
 | Variable | Rôle |
@@ -32,7 +48,18 @@ Le dossier `./data` doit appartenir à l'utilisateur indiqué par `NUMMUS_UID`/`
 | `NUMMUS_PORT` | Port publié sur l'hôte (défaut 8080). |
 | `NUMMUS_BACKUP_EVERY_HOURS` / `NUMMUS_BACKUP_KEEP` | Sauvegarde automatique toutes les N heures **si la base a changé** (0 = désactivée) ; nombre de copies conservées. |
 
+| `NUMMUS_WEBDAV_URL` / `_USER` / `_PASSWORD` / `_EVERY_HOURS` | Copie JSON de chaque profil vers un WebDAV, **faite par le serveur** si la base a changé. Aucun mot de passe dans le navigateur. |
+| `NUMMUS_TRUST_PROXY` | À activer derrière un proxy inverse : la limite de 10 mots de passe erronés en 5 minutes (réponse 429) utilise alors `X-Forwarded-For`. |
+
 Autres réglages (facultatifs, voir `backend/app/config.py`) : `NUMMUS_PRICES_URL`, `NUMMUS_FX_URL`, `NUMMUS_PRICES_TTL`, `NUMMUS_MAX_IMAGE_MB`.
+
+## Sécurité : ce qui est (et n'est pas) protégé
+
+- Le **mode vitrine** est un confort d'affichage, **pas une sécurité** : le masquage des prix et champs privés est fait dans le navigateur, l'API renvoie tout à qui est authentifié. Pour exposer une collection, utilisez l'authentification Basic et un accès réseau restreint.
+- En-têtes `nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy`, compression gzip ; images servies en `Content-Security-Policy: sandbox` ; seuls JPEG, PNG, WebP, GIF, AVIF et PDF sont acceptés en téléversement.
+- Les mots de passe WebDAV et clés Numista ne sont plus inclus dans les exports JSON ; en mode serveur ils restent côté serveur.
+- **Chiffrement** : Réglages > Chiffrement exporte en AES-256-GCM (clé dérivée par PBKDF2). Le mot de passe n'est jamais stocké ni récupérable. La base locale du navigateur n'est pas chiffrée.
+- **Sauvegardes** : les copies manuelles (`manuel-…`) ne sont jamais effacées par la rotation. Elles restent sur le même disque : copiez périodiquement `data/backups` ailleurs (cron + `rsync` ou `rclone`), ou activez WebDAV.
 
 ## Migrer ou sauvegarder ses données
 
@@ -123,3 +150,15 @@ Pour utiliser le frontend seul, 100 % dans le navigateur (IndexedDB), remplacer 
 ## Migrations de schéma (pour développeurs)
 
 Ajouter un tuple `(n, "description", SQL ou fonction python(conn))` à la fin de `MIGRATIONS` dans `backend/app/migrations.py` (ne jamais modifier une migration déjà publiée) : il sera appliqué une seule fois, dans une transaction, après une copie de sécurité automatique. Les fiches étant stockées en JSON, ajouter un champ côté interface ne demande aucune migration.
+
+
+## Tests et qualité
+
+- Backend : `cd backend && pytest`.
+- Logique pure du frontend (recherche, utilitaires) : `node --test frontend/tests/*.test.js`.
+- Lint : `npm install && npm run lint` (ESLint, règle `no-undef` avec la liste des globales générée par `npm run globals`) ; formatage `npm run format` (Prettier, à utiliser sur les fichiers que vous modifiez, sans reformatage global).
+- Intégration continue : `.github/workflows/ci.yml` lance pytest, les tests JS et `docker build`.
+
+## Composants tiers
+
+qrcode-generator 1.4.4 (MIT, `frontend/vendor/qrcode.js`), d3, topojson-client, KaTeX.

@@ -1,14 +1,14 @@
 'use strict';
 /* ---------- préférences & état ---------- */
 /* listes d'objets (à identifiant) stockées avec les préférences du profil, donc exportées et fusionnées avec elles */
-const LIST_PREFS=['series','containers','expos','journal','mints','goals'];
+const LIST_PREFS=['series','containers','expos','journal','mints','goals','rules','lots','hallmarks'];
 function mergeById(cur,inc){['folders','catalogs',...LIST_PREFS].forEach(k=>(inc[k]||[]).forEach(x=>{if(!(cur[k]=cur[k]||[]).some(y=>y.id===x.id))cur[k].push(x)}))}
 const DEFAULT_PREFS=()=>({
  fieldPrefs:{},customFields:[],folders:[],catalogs:[],
  ...Object.fromEntries(LIST_PREFS.map(k=>[k,[]])),views:{},dismissed:{},
  modules:{catalogs:true,wishlist:true,atlas:true,timeline:true,stats:true,doubles:true,storage:true,tools:true},
  settings:{theme:'dark',accent:'#2f8a78',currency:'€',currencyCode:'EUR',view:'grid',glass:true,ambient:true,blur:14,contrast:false,owner:'',
-  wishBudget:'',journalAcq:false,daily:{mode:'random'},anomaly:{weight:3,diameter:2},
+  wishBudget:'',siteUrl:'',dash:{order:[],hidden:[],shown:[]},badgeSeen:{},journalAcq:false,daily:{mode:'random'},anomaly:{weight:3,diameter:2},
   prices:{gold:'',silver:'',platinum:'',palladium:''},
   numista:{key:'',baseUrl:CONFIG.numista.baseUrl},
   backup:{intervalDays:CONFIG.backupIntervalDays,last:null,since:null,snoozeUntil:null},
@@ -17,17 +17,20 @@ const DEFAULT_PREFS=()=>({
 function normalizePrefs(p){
  const d=DEFAULT_PREFS();p=p||{};const ps=p.settings||{};
  const s=Object.assign(d.settings,ps);
- ['prices','numista','backup','vitrine','webdav','daily','anomaly'].forEach(k=>s[k]=Object.assign(DEFAULT_PREFS().settings[k],ps[k]||{}));
+ ['prices','numista','backup','vitrine','webdav','daily','anomaly','dash'].forEach(k=>s[k]=Object.assign(DEFAULT_PREFS().settings[k],ps[k]||{}));
  return{fieldPrefs:p.fieldPrefs||{},customFields:p.customFields||[],folders:p.folders||[],catalogs:p.catalogs||[],
   ...Object.fromEntries(LIST_PREFS.map(k=>[k,Array.isArray(p[k])?p[k]:[]])),views:p.views||{},dismissed:p.dismissed||{},
   modules:Object.assign(d.modules,p.modules||{}),settings:s};
 }
 let state=null;
 const session={users:[]};
+/* copie des préférences sans secrets : le mot de passe WebDAV et la clé Numista ne sortent jamais du navigateur
+   (exports, envoi au serveur) ; en mode serveur, ils sont gérés par l'environnement du conteneur */
+function stripSecrets(p){const o=JSON.parse(JSON.stringify(p||{}));if(o.settings){if(o.settings.webdav)o.settings.webdav.pass='';if(o.settings.numista)o.settings.numista.key=''}return o}
 const prefsOf=()=>({fieldPrefs:state.fieldPrefs,customFields:state.customFields,folders:state.folders,catalogs:state.catalogs,...Object.fromEntries(LIST_PREFS.map(k=>[k,state[k]])),views:state.views,dismissed:state.dismissed,modules:state.modules,settings:state.settings});
 function fail(e){console.error(e);if(persistent){persistent=false;toast('Sauvegarde impossible : les données ne seront pas conservées');const f=$('#pstate');if(f)f.textContent='Mode temporaire'}}
 let prefsDirty=false;
-function savePrefsNow(){prefsDirty=false;mirrorUI();return Store.meta.put(state.userId,'prefs',prefsOf()).catch(fail)}
+function savePrefsNow(){prefsDirty=false;mirrorUI();return Store.meta.put(state.userId,'prefs',Store.kind==='rest'?stripSecrets(prefsOf()):prefsOf()).catch(fail)}
 const savePrefsLater=debounce(()=>{if(prefsDirty)savePrefsNow()},250);
 function savePrefs(){prefsDirty=true;mirrorUI();savePrefsLater()}
 addEventListener('pagehide',()=>{if(prefsDirty)savePrefsNow()});
@@ -37,7 +40,7 @@ function putItems(list){
  recordPut(list);
  return Store.items.bulkPut(state.userId,list).catch(fail);
 }
-function removeItems(ids){const s=new Set(ids);recordDel(state.items.filter(i=>s.has(i.id)));const im=state.items.filter(i=>s.has(i.id)).flatMap(i=>(i.imgs||[]).map(m=>m.id));state.items=state.items.filter(i=>!s.has(i.id));ids.forEach(id=>ui.picked.delete(id));im.forEach(forgetImg);return Promise.all([Store.items.bulkDelete(state.userId,[...s]),im.length?Store.images.bulkDelete(state.userId,im):0]).catch(fail)}
+function removeItems(ids){const s=new Set(ids);recordDel(state.items.filter(i=>s.has(i.id)));const im=state.items.filter(i=>s.has(i.id)).flatMap(i=>[...(i.imgs||[]),...(i.docs||[])].map(m=>m.id));state.items=state.items.filter(i=>!s.has(i.id));ids.forEach(id=>ui.picked.delete(id));im.forEach(forgetImg);return Promise.all([Store.items.bulkDelete(state.userId,[...s]),im.length?Store.images.bulkDelete(state.userId,im):0]).catch(fail)}
 function mirrorUI(){const s=state.settings;lsSet('nummus.ui',{theme:s.theme,accent:s.accent,glass:s.glass,ambient:s.ambient,blur:s.blur,contrast:s.contrast})}
 async function loadUser(id){
  if(state&&prefsDirty)await savePrefsNow();
@@ -45,7 +48,10 @@ async function loadUser(id){
  const raw=items.map(sanitizeItem),chg=[];
  for(const it of raw){try{if(await normalizeItemImages(id,it))chg.push(it)}catch(e){console.warn('migration images',e)}}
  if(chg.length)await Store.items.bulkPut(id,chg).catch(fail);
- state={userId:id,items:raw.sort((a,b)=>(b.created||0)-(a.created||0)),...normalizePrefs(prefs)};
+ const sorted=raw.sort((a,b)=>(b.created||0)-(a.created||0));
+ /* corbeille : les fiches supprimées restent en base 30 jours avec un champ « deleted », hors de state.items */
+ state={userId:id,items:sorted.filter(i=>!i.deleted),trash:sorted.filter(i=>i.deleted),...normalizePrefs(prefs)};
+ if(typeof purgeTrash==='function')purgeTrash();
  await primeEvents(id);
  if(!state.settings.backup.since){state.settings.backup.since=Date.now();savePrefs()}
  lsSet('nummus.user',id);mirrorUI();
@@ -71,6 +77,9 @@ const lists={
  storages:()=>{const s=new Set();state.items.forEach(i=>{const p=normPath(i.storage);if(!p)return;const parts=p.split(' > ');parts.forEach((_,n)=>s.add(parts.slice(0,n+1).join(' > ')))});return[...s].sort((a,b)=>a.localeCompare(b,'fr',{numeric:true}))},
  materials:()=>['Papier','Coton','Polymère','Papier / fibres mixtes'],
  tags:()=>uniq(state.items.flatMap(tagsOf)).sort((a,b)=>a.localeCompare(b,'fr')),
+ dynasties:()=>uniq(state.items.map(i=>i.dynasty)).sort((a,b)=>a.localeCompare(b,'fr')),
+ engravers:()=>uniq(state.items.map(i=>i.engraver)).sort((a,b)=>a.localeCompare(b,'fr')),
+ hoards:()=>uniq(state.items.map(i=>i.hoard)).sort((a,b)=>a.localeCompare(b,'fr')),
  currencies:()=>uniq(['EUR','USD','GBP','JPY','CHF','CAD','AUD','CNY','SEK','NOK','DKK','PLN','CZK','HUF','TRY','INR','MXN','BRL','ZAR',state.settings.currencyCode,...state.items.map(i=>i.paidCur)])
 };
 const catName=id=>(state.catalogs.find(c=>c.id===id)||{}).name||'';

@@ -238,6 +238,7 @@ table.ref input{padding:4px 8px;max-width:130px}
 #banner[hidden]{display:none}
 #toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--text);color:var(--bg);padding:9px 16px;border-radius:12px;opacity:0;pointer-events:none;transition:opacity .2s;z-index:80}
 #toast.on{opacity:1}
+#toast.act{pointer-events:auto;display:flex;gap:10px;align-items:center}
 .vitbar{display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:14px;background:color-mix(in srgb,var(--accent) 16%,transparent);font-size:13px}
 .mobile-only{display:none}
 #print{display:none}

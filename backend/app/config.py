@@ -17,7 +17,7 @@ FRONTEND_DIR = Path(os.environ.get("NUMMUS_FRONTEND_DIR", Path(__file__).resolve
 
 # Sauvegardes automatiques (copie cohérente de la base, uniquement si elle a changé). 0 = désactivées.
 BACKUP_EVERY_HOURS = float(os.environ.get("NUMMUS_BACKUP_EVERY_HOURS", "24"))
-BACKUP_KEEP = int(os.environ.get("NUMMUS_BACKUP_KEEP", "14"))
+BACKUP_KEEP = int(os.environ.get("NUMMUS_BACKUP_KEEP", "7"))
 
 # Authentification HTTP Basic facultative (laisser vide pour la désactiver, ex. derrière un SSO).
 AUTH_USER = os.environ.get("NUMMUS_USER", "nummus")
@@ -33,3 +33,22 @@ FX_URL = os.environ.get("NUMMUS_FX_URL", "https://api.frankfurter.app/latest?fro
 PRICES_TTL = int(os.environ.get("NUMMUS_PRICES_TTL", "900"))
 
 MAX_IMAGE_BYTES = int(os.environ.get("NUMMUS_MAX_IMAGE_MB", "25")) * 1024 * 1024
+
+# Protection contre la force brute sur l'authentification : N échecs en WINDOW secondes => HTTP 429.
+AUTH_MAX_FAILS = int(os.environ.get("NUMMUS_AUTH_MAX_FAILS", "10"))
+AUTH_WINDOW = int(os.environ.get("NUMMUS_AUTH_WINDOW", "300"))
+# À activer uniquement derrière un reverse proxy de confiance (Caddy…) : l'IP du client est lue dans X-Forwarded-For.
+TRUST_PROXY = os.environ.get("NUMMUS_TRUST_PROXY", "").lower() in ("1", "true", "yes")
+
+# Cache du proxy Numista (secondes).
+NUMISTA_TTL = int(os.environ.get("NUMMUS_NUMISTA_TTL", "86400"))
+
+# Synchronisation WebDAV exécutée par le serveur (le mot de passe ne transite plus par le navigateur).
+# Laisser NUMMUS_WEBDAV_URL vide pour la désactiver. Le fichier est écrit sous <URL>/nummus-<profil>.json
+WEBDAV_URL = os.environ.get("NUMMUS_WEBDAV_URL", "")
+WEBDAV_USER = os.environ.get("NUMMUS_WEBDAV_USER", "")
+WEBDAV_PASSWORD = os.environ.get("NUMMUS_WEBDAV_PASSWORD", "")
+WEBDAV_EVERY_HOURS = float(os.environ.get("NUMMUS_WEBDAV_EVERY_HOURS", "24"))
+
+# Types de fichiers acceptés par /images (images + pièces jointes PDF). Tout le reste est refusé.
+ALLOWED_BLOB_TYPES = ("image/jpeg", "image/png", "image/webp", "image/gif", "image/avif", "application/pdf")
