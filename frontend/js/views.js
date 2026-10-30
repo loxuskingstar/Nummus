@@ -43,6 +43,20 @@ function metalPortfolio(L){
  L.forEach(i=>{if(i.type==='note')return;const c=metalClass(i);if(!c)return;const w=+i.weight,f=fineOf(i);if(!w||!f){missing.push(i);return}r[c].g+=w*qtyOf(i)*f/1000;r[c].n+=qtyOf(i)});
  return{r,missing};
 }
+function statsMetals(L,hv){
+ const mp=metalPortfolio(L),pr=state.settings.prices,f2=new Intl.NumberFormat('fr-FR',{maximumFractionDigits:2}),f3=new Intl.NumberFormat('fr-FR',{maximumFractionDigits:3});
+ let metalTotal=0;
+ const mrows=METAL_CLASSES.filter(([k])=>mp.r[k].g>0||k==='gold'||k==='silver').map(([k,l])=>{const g=mp.r[k].g,oz=g/31.1035,p=+pr[k];const val=p?oz*p:null;if(val)metalTotal+=val;
+  return `<tr><th>${l}</th><td class="r">${mp.r[k].n}</td><td class="r">${f3.format(g)} g</td><td class="r">${f3.format(oz)}</td>${hv?'':`<td class="r"><input type="number" step="any" data-ch="price" data-k="${k}" value="${esc(pr[k])}" placeholder="cours / oz" aria-label="Cours ${l}"></td><td class="r">${val?fmtMoney(val):'—'}</td>`}</tr>`}).join('');
+ return `<section class="panel glass" style="margin-bottom:16px"><h2>Portefeuille métaux précieux</h2>
+  <p class="muted small">Calcul automatique sur toutes les pièces dont le métal, le poids et le titre sont renseignés (le titre peut aussi être lu dans le champ métal, ex. « Argent 900‰ »).</p>
+  <div class="formula">${tex('m_{\\text{fin}} = \\sum_i \\left( m_i \\times q_i \\times \\frac{t_i}{1000} \\right)',true)}<span class="small">avec ${tex('m_i')} le poids en grammes, ${tex('q_i')} la quantité et ${tex('t_i')} le titre en ‰ ; une once troy vaut ${tex('31{,}1035\\ \\text{g}')}.</span></div>
+  <div style="overflow-x:auto;margin-top:10px"><table class="ref"><tr><th>Métal</th><th class="r">Exemplaires</th><th class="r">Poids fin</th><th class="r">Onces troy</th>${hv?'':`<th class="r">Cours (${esc(state.settings.currency)}/oz)</th><th class="r">Valeur métal</th>`}</tr>${mrows}
+  ${hv||!metalTotal?'':`<tr><th colspan="5">Total valeur métal</th><td class="r"><b>${fmtMoney(metalTotal)}</b></td></tr>`}</table></div>
+  ${mp.missing.length?`<p class="muted small" style="margin-top:8px">${pl(mp.missing.length,'pièce en métal précieux ignorée','pièces en métal précieux ignorées')} faute de poids ou de titre : ${mp.missing.slice(0,6).map(i=>`<a class="link" href="#" data-act="open" data-id="${i.id}">${esc(i.denomination)}</a>`).join(', ')}${mp.missing.length>6?'…':''}</p>`:''}
+  ${hv?'':`<div class="actions" style="margin-top:10px">${Integrations.prices.available()?`<button class="btn sm" data-act="pricesFetch">${ic('refresh',14)} Actualiser les cours</button>`:'<span class="muted small">Cours saisis manuellement. L’actualisation automatique sera branchée sur le backend (route /api/prices).</span>'}</div>`}
+ </section>`;
+}
 function viewStats(){
  const L=pool().filter(i=>i.status!=='wish');
  if(!L.length)return `<header class="head"><h1>Statistiques</h1></header><div class="empty glass"><b>Pas encore de statistiques</b><p>Ajoutez des entrées à votre collection pour les voir apparaître ici.</p></div>`;
@@ -50,21 +64,10 @@ function viewStats(){
  const gain=paid?Math.round((val-paid)/paid*100):null,hv=hideVals(),v=vit();
  const cent=tally(L.filter(hasYear),i=>Math.sign(+i.year||1)*Math.ceil(Math.abs(+i.year)/100||1),qtyOf).sort((a,b)=>a[0]-b[0]).map(([c,n])=>[century(c*100-(c<0?-50:50)),n]);
  const prime=L.slice().sort(SORT.value).filter(i=>+i.value>0).slice(0,5);
- const mp=metalPortfolio(L),pr=state.settings.prices,f2=new Intl.NumberFormat('fr-FR',{maximumFractionDigits:2}),f3=new Intl.NumberFormat('fr-FR',{maximumFractionDigits:3});
- let metalTotal=0;
- const mrows=METAL_CLASSES.filter(([k])=>mp.r[k].g>0||k==='gold'||k==='silver').map(([k,l])=>{const g=mp.r[k].g,oz=g/31.1035,p=+pr[k];const val=p?oz*p:null;if(val)metalTotal+=val;
-  return `<tr><th>${l}</th><td class="r">${mp.r[k].n}</td><td class="r">${f3.format(g)} g</td><td class="r">${f3.format(oz)}</td>${hv?'':`<td class="r"><input type="number" step="any" data-ch="price" data-k="${k}" value="${esc(pr[k])}" placeholder="cours / oz" aria-label="Cours ${l}"></td><td class="r">${val?fmtMoney(val):'—'}</td>`}</tr>`}).join('');
  return `<header class="head"><h1>Statistiques</h1></header>
  <div class="kpis"><div class="kpi glass"><b>${tot}</b><span>exemplaires (${L.length} entrées)</span></div><div class="kpi glass"><b>${new Set(L.map(i=>i.country).filter(Boolean)).size}</b><span>pays</span></div>
  ${v?'':`<div class="kpi glass"><b>${fmtMoney(paid)}</b><span>investi</span></div>`}${hv?'':`<div class="kpi glass"><b>${fmtMoney(val)}</b><span>valeur estimée${gain!==null&&!v?` (${gain>0?'+':''}${gain} %)`:''}</span></div>`}</div>
- <section class="panel glass" style="margin-bottom:16px"><h2>Portefeuille métaux précieux</h2>
-  <p class="muted small">Calcul automatique sur toutes les pièces dont le métal, le poids et le titre sont renseignés (le titre peut aussi être lu dans le champ métal, ex. « Argent 900‰ »).</p>
-  <div class="formula">${tex('m_{\\text{fin}} = \\sum_i \\left( m_i \\times q_i \\times \\frac{t_i}{1000} \\right)',true)}<span class="small">avec ${tex('m_i')} le poids en grammes, ${tex('q_i')} la quantité et ${tex('t_i')} le titre en ‰ ; une once troy vaut ${tex('31{,}1035\\ \\text{g}')}.</span></div>
-  <div style="overflow-x:auto;margin-top:10px"><table class="ref"><tr><th>Métal</th><th class="r">Exemplaires</th><th class="r">Poids fin</th><th class="r">Onces troy</th>${hv?'':`<th class="r">Cours (${esc(state.settings.currency)}/oz)</th><th class="r">Valeur métal</th>`}</tr>${mrows}
-  ${hv||!metalTotal?'':`<tr><th colspan="5">Total valeur métal</th><td class="r"><b>${fmtMoney(metalTotal)}</b></td></tr>`}</table></div>
-  ${mp.missing.length?`<p class="muted small" style="margin-top:8px">${pl(mp.missing.length,'pièce en métal précieux ignorée','pièces en métal précieux ignorées')} faute de poids ou de titre : ${mp.missing.slice(0,6).map(i=>`<a class="link" href="#" data-act="open" data-id="${i.id}">${esc(i.denomination)}</a>`).join(', ')}${mp.missing.length>6?'…':''}</p>`:''}
-  ${hv?'':`<div class="actions" style="margin-top:10px">${Integrations.prices.available()?`<button class="btn sm" data-act="pricesFetch">${ic('refresh',14)} Actualiser les cours</button>`:'<span class="muted small">Cours saisis manuellement. L’actualisation automatique sera branchée sur le backend (route /api/prices).</span>'}</div>`}
- </section>
+ ${statsMetals(L,hv)}
  <div class="cols">
  <section class="panel glass"><h2>Pièces et billets</h2>${bars(byVal(tally(L,i=>i.type==='note'?'Billets':'Pièces',qtyOf)))}</section>
  <section class="panel glass"><h2>Pays les mieux représentés</h2>${bars(byVal(tally(L,i=>cname(i.country),qtyOf)),10)}</section>

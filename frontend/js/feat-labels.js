@@ -14,7 +14,8 @@ const LBL_FORMATS={
  lab38:{name:'Petite étiquette 38 × 21 mm (alvéole), 65 par page',w:38,h:21,cols:5,rows:13,gx:1,gy:1,size:'s'}
 };
 const LBL={src:'all',ctr:'',fmt:'cr80',target:'app',cut:true,qr:true,
- f:{place:true,metal:true,grade:true,ref:true,slot:true}};
+ f:{year:true,place:true,metal:true,grade:true,ref:true,slot:true}};
+let LBL_MERGED=0;
 
 /* ---------- liens et QR ---------- */
 const appBase=()=>location.origin==='null'?location.href.split('#')[0]:location.origin+location.pathname;
@@ -39,6 +40,15 @@ addEventListener('hashchange',()=>{if(state)openFromHash()});
 
 /* ---------- sources ---------- */
 function lblItems(){
+ const l=lblItemsRaw();LBL_MERGED=0;
+ if(LBL.f.year)return l;
+ /* sans date : une seule étiquette par type (même pays, dénomination, métal, variété), tous millésimes confondus */
+ const seen=new Map();
+ l.forEach(x=>{const i=x.it,k=[i.type,i.country||norm(i.issuer),norm(i.denomination),norm(String(i.metal||'').replace(/[\d‰%.,\s]+/g,'')),norm(i.variety)].join('|');
+  if(seen.has(k)){LBL_MERGED++;delete seen.get(k).n}else seen.set(k,x)});
+ return[...seen.values()];
+}
+function lblItemsRaw(){
  if(LBL.src==='sel'&&ui.picked.size)return[...ui.picked].map(id=>state.items.find(i=>i.id===id)).filter(Boolean).map(it=>({it}));
  if(LBL.src==='filtered'&&ui.lastResults.length)return ui.lastResults.filter(i=>i.status!=='wish').map(it=>({it}));
  if(LBL.src==='ctr'){
@@ -52,7 +62,7 @@ function lblItems(){
 function lblHTML(x,fmt){
  const it=x.it,F=LBL.f,size=fmt.size;
  const facts=[];
- facts.push(esc([cname(it.country)||it.issuer,yearSpan(it)].filter(Boolean).join(' · ')));
+ facts.push(esc([cname(it.country)||it.issuer,F.year?yearSpan(it):''].filter(Boolean).join(' · ')));
  if(F.metal)facts.push(esc([it.metal,!isEmpty(it.weight)?it.weight+' g':'',!isEmpty(it.diameter)?it.diameter+' mm':''].filter(Boolean).join(' · ')));
  if(F.grade&&it.grade)facts.push('État : '+esc(it.grade));
  if(F.ref&&(it.catalog||it.numista))facts.push(esc(it.catalog||'N# '+it.numista));
@@ -83,8 +93,9 @@ function viewLabels(){
   <div class="fld"><label>Le QR ouvre…</label><select data-ch="lblTarget">${opt([['app','la fiche dans l’application'],['site','la page de la vitrine publique']],LBL.target)}</select></div>
   ${LBL.target==='site'?`<div class="fld wide"><label>Adresse de la vitrine publique</label><input data-ch="siteUrl" value="${esc(state.settings.siteUrl||'')}" placeholder="https://monsite.fr/collection/"></div>`:''}
  </div>
- <div class="actions" style="margin-top:12px;gap:18px">${ck('metal','Métal, poids, diamètre')}${ck('grade','État')}${ck('ref','Référence')}${ck('place','Atelier')}${ck('slot','N° d’emplacement (contenant)')}
+ <div class="actions" style="margin-top:12px;gap:18px">${ck('year','Date')}${ck('metal','Métal, poids, diamètre')}${ck('grade','État')}${ck('ref','Référence')}${ck('place','Atelier')}${ck('slot','N° d’emplacement (contenant)')}
   <label class="chk"><input type="checkbox" data-ch="lblQr" ${LBL.qr?'checked':''}> QR code</label><label class="chk"><input type="checkbox" data-ch="lblCut" ${LBL.cut?'checked':''}> Traits de découpe</label></div>
+ ${LBL.f.year?'':`<p class="muted small" style="margin-top:8px">Sans date, une seule étiquette est imprimée par type (même pays, dénomination, métal et variété)${LBL_MERGED?` : ${pl(LBL_MERGED,'doublon regroupé','doublons regroupés')}`:''}. Le QR ouvre la fiche de la première pièce du groupe.</p>`}
  ${LBL.target==='app'&&local?`<p class="muted small" style="margin-top:8px">${ic('warn',14)} L’adresse actuelle (${esc(location.host||'fichier local')}) n’est joignable que depuis cet appareil ou ce réseau : le QR ne s’ouvrira pas ailleurs. Pour un QR utilisable partout, publiez l’application derrière un nom de domaine ou utilisez la vitrine publique.</p>`:''}</div>
  ${list.length?`<p class="muted small" style="margin:10px 0">Aperçu de la première page (${pl(Math.ceil(list.length/per),'page','pages')}, ${per} par page, à imprimer à 100 %, sans mise à l’échelle).</p><div class="lblprev">${lblSheet(list.slice(0,per),fmt)}</div>`
  :`<div class="empty glass"><b>Rien à imprimer</b><p>${LBL.src==='ctr'?'Choisissez un contenant dont des emplacements sont occupés.':LBL.src==='sel'?'Sélectionnez des pièces dans la collection (bouton Sélection) puis revenez ici.':'Ajoutez des pièces à la collection.'}</p></div>`}`;
