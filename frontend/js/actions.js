@@ -18,7 +18,12 @@ const ACT={
  open:(t,e)=>{if(e&&e.preventDefault&&t.tagName==='A')e.preventDefault();if(ui.selecting&&isListView()&&t.closest('#results')){const id=t.dataset.id;ui.picked.has(id)?ui.picked.delete(id):ui.picked.add(id);syncPicked();return}openDetail(t.dataset.id)},
  edit:t=>openForm(t.dataset.id),
  acquire:t=>openForm(t.dataset.id,{status:'owned',acquired:today(),qty:1}),
- dup:t=>{const o=state.items.find(i=>i.id===t.dataset.id);if(!o)return;const c=clone(o);c.id=uid();c.created=Date.now();putItems([c]);closeModal();render();toast('Entrée dupliquée')},
+ dup:async t=>{
+  const o=state.items.find(i=>i.id===t.dataset.id);if(!o)return;const c=clone(o);c.id=uid();c.created=Date.now();
+  /* la copie reçoit ses propres fichiers : sinon les deux fiches partagent les mêmes identifiants d'image et supprimer l'une efface les photos de l'autre */
+  try{for(const list of [c.imgs,c.docs])for(const m of list||[]){const b=await Store.images.get(state.userId,m.id);if(!b)continue;const nid=(m.id[0]==='d'&&m.id[1]==='_'?'d_':'im_')+uid();await Store.images.put(state.userId,nid,b);m.id=nid}}
+  catch(e){fail(e);return}
+  putItems([c]);closeModal();render();toast('Entrée dupliquée')},
  del:t=>{const o=state.items.find(i=>i.id===t.dataset.id);if(o){closeModal();trashWithUndo([o.id],`« ${o.denomination} » déplacée dans la corbeille.`);render()}},
  close:()=>closeModal(),close2:()=>closeModal2(),
  /* images */
