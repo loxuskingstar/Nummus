@@ -1,5 +1,7 @@
 # Nummus
 
+Il s'agit avant tout d'un projet personnel, il n'est pas destiné à être mis à jour régulièrement et maintenu sur le long terme
+
 Gestionnaire de collection numismatique (pièces et billets) : interface web + API Python, un seul conteneur.
 Tout ce qui est à vous vit dans **un seul dossier, `data/`**, que l'on copie pour changer de serveur.
 
